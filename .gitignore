@@ -4,7 +4,7 @@
 ._.DS_Store
 results/
 logs/
-Galaxy-Workflow-The_magic_viral_genome_reconstruction_pipeline*
+galaxy_workflow_export.ga
 
 __pycache__/
 *.py[codz]
