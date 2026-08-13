@@ -4,24 +4,29 @@
 # bed
 sample_sheet: sample_sheet.tsv
 
-# Optional annotation input
-gff: data/annotation.gff3      # optional, set to null if not used
-
+# fastp parameters
 min_base_quality: 20
 min_read_length: 30
-min_mapping_quality: 30
-min_coverage: 10
-min_variant_quality: 20
-min_depth: 20
-min_allele_frequency: 0.8
-min_consensus_frequency: 0.8
+fastp_extra: ""
 
 
-# ivar
+# samtools view filtering
+min_mapping_quality: 20 # MAPQ score
+
+# variant calling parameters
+min_allele_frequency_variant: 0.1
+
+
+# ivar trimming parameters
 min_length_after_trimming: 50
 
 
-fastp_extra: ""
+# ivar consensus parameters
+min_variant_quality: 30 # Phred score
+min_consensus_frequency: 0.75
+min_depth: 20
+
+# BWA MEM parameters
 bwa_mem_extra: ""
 
 run_denovo: true

@@ -1,5 +1,9 @@
 # Byte-compiled / optimized / DLL files
-.snakemake
+.snakemake/
+.DS_Store
+._.DS_Store
+results/
+
 __pycache__/
 *.py[codz]
 *$py.class

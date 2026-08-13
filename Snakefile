@@ -128,7 +128,9 @@ rule all:
     input:
         expand("results/{sample}/qc/{sample}_R1.fastq.gz", sample=SAMPLES),
         expand("results/{sample}/qc/{sample}_R2.fastq.gz", sample=SAMPLES),
-        [f"results/{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam" for sample, reference in RUN_KEYS]
+        # [f"results/{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam" for sample, reference in RUN_KEYS]
+        [f"results/{sample}/consensus/{sample}_{reference}_consensus.fa" for sample, reference in RUN_KEYS]
+
 
    
 rule prepare_reference:
@@ -256,26 +258,35 @@ rule trim_bam:
         """
 
 
-# rule create_consensus:
-#     input:
-#         bam="results/{sample}/mapping/{sample}_{reference}.bam",
-#         ref=_reference_fasta
-#     output:
-#         "results/{sample}/consensus/{sample}_{reference}.consensus.fa"
-#     params:
-#         min_quality=config.get("min_variant_quality", 20),
-#         min_freq=config.get("min_consensus_frequency", 0.8),
-#         min_depth=config.get("min_depth", 20)
-#     conda:
-#         ENV_CORE
-#     shell:
-#         """
-#         samtools mpileup -A -d 0 -Q 0 {input.bam} | \
-#             ivar consensus -q {params.min_quality} -t {params.min_freq} -m {params.min_depth} -p results/{wildcards.sample}/consensus/{wildcards.sample}_{wildcards.reference}
+def get_bam_input(wildcards):
+    if  SAMPLES_MAP[wildcards.sample]["bed"]:
+        bam_path = f"results/{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.sorted.filtered.trimmed.bam"
+    else:
+        bam_path = f"results/{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.sorted.filtered.bam"   
+    return bam_path
 
-#         samtools mpileup -A -a -d 0 -Q 0 sorted.bam | ivar consensus -p consensus -q 30 -t 0.75 -c 0.75 -m 20 -n N && sed -i "s|consensus|HSV_2_UL30|" consensus.fa
-#         mv results/{wildcards.sample}/consensus/{wildcards.sample}_{wildcards.reference}.fa {output}
-#         """
+
+rule create_consensus:
+    input:
+        bam= get_bam_input
+    output:
+        "results/{sample}/consensus/{sample}_{reference}_consensus.fa"
+    params:
+        min_quality=config.get("min_variant_quality", 20),
+        min_freq=config.get("min_consensus_frequency", 0.8),
+        min_depth=config.get("min_depth", 20),
+        prefix = lambda wildcards: f"results/{wildcards.sample}/consensus/{wildcards.sample}_{wildcards.reference}_consensus"
+    log:
+        stdout="logs/{sample}/create_consensus_{reference}.stdout.log",
+        stderr="logs/{sample}/create_consensus_{reference}.stderr.log"
+    conda:
+        'requirements/requirements_aln.yaml'
+    shell:
+        """
+        samtools mpileup -A -a -d 0 -Q 0 {input.bam} 2> {log.stderr} | \
+        ivar consensus -p {params.prefix} -q {params.min_quality} -t {params.min_freq} -c 0.75 -m {params.min_depth} -n N \
+        >> {log.stdout} 2>> {log.stderr};
+        """
 
 # rule call_variants_lofreq:
 #     input:
