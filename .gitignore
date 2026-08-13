@@ -3,6 +3,8 @@
 .DS_Store
 ._.DS_Store
 results/
+logs/
+Galaxy-Workflow-The_magic_viral_genome_reconstruction_pipeline*
 
 __pycache__/
 *.py[codz]
