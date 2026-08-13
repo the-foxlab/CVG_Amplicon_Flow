@@ -1,0 +1,2 @@
+sample	reference_fasta	bed	r1	r2
+1545554-HSV2_S82	/home/udo/shared/researchers/udo_gieraths/galaxy_port_data/refs/HSV_2_both.fasta	/home/udo/shared/researchers/udo_gieraths/galaxy_port_data/beds/HSV_2_both.bed	/home/udo/shared/researchers/udo_gieraths/galaxy_port_data/fastqs/1545554-HSV2_S82_L001_R1_001.fastq.gz	/home/udo/shared/researchers/udo_gieraths/galaxy_port_data/fastqs/1545554-HSV2_S82_L001_R2_001.fastq.gz

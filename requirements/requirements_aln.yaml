@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - bwa=0.7.19
+  - samtools=1.22
+  - ivar=1.4.4
+

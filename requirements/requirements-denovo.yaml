@@ -1,0 +1,11 @@
+name: galaxy-port-denovo
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - megahit=1.2.9
+  - spades=4.3.0
+  - quast=5.3.0
+  - cap3=2.0.0
+  - bedtools=2.27.1

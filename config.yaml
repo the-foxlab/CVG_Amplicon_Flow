@@ -1,0 +1,29 @@
+# Required sample sheet columns:
+# sample, reference_fasta, r1, r2
+# Optional sample sheet column:
+# bed
+sample_sheet: sample_sheet.tsv
+
+# Optional annotation input
+gff: data/annotation.gff3      # optional, set to null if not used
+
+min_base_quality: 20
+min_read_length: 30
+min_mapping_quality: 30
+min_coverage: 10
+min_variant_quality: 20
+min_depth: 20
+min_allele_frequency: 0.8
+min_consensus_frequency: 0.8
+
+
+# ivar
+min_length_after_trimming: 50
+
+
+fastp_extra: ""
+bwa_mem_extra: ""
+
+run_denovo: true
+run_metagenomics: false
+build_snpeff_db: false

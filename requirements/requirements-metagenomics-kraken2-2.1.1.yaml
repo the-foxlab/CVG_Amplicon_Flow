@@ -1,0 +1,9 @@
+name: galaxy-port-metagenomics-kraken2-2-1-1
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - kraken2=2.1.1
+  - krakentools=1.2
+  - krona=2.8
