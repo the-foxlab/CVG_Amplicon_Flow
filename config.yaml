@@ -2,7 +2,7 @@
 # sample, reference_fasta, r1, r2
 # Optional sample sheet column:
 # bed
-sample_sheet: sample_sheet.tsv
+sample_sheet: sample_sheet.csv
 
 # fastp parameters
 min_base_quality: 20

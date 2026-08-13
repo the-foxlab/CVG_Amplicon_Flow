@@ -45,7 +45,7 @@ def _read_bed_names(bed_path):
 
 def _load_samples_from_sheet(sample_sheet):
     samples = {}
-    table = pd.read_csv(sample_sheet, sep=None, engine="python")
+    table = pd.read_csv(sample_sheet, sep=',', engine="python")
 
     required_columns = {"sample", "reference_fasta", "r1", "r2"}
     if not required_columns.issubset(set(table.columns)):
@@ -192,7 +192,8 @@ rule map_reads:
         stdout="logs/{sample}/map_reads.stdout.log",
         stderr="logs/{sample}/map_reads.stderr.log"
     params:
-        extra=config.get("bwa_mem_extra", "")
+        extra=config.get("bwa_mem_extra", ""),
+        min_mapping_quality=config.get("min_mapping_quality", 30)
     threads:
         16
     conda:
@@ -201,7 +202,7 @@ rule map_reads:
         """
         bwa mem -t {threads} -T 30 -h 5 {params.extra} {input.ref} {input.r1} {input.r2} 2> {log.stderr} \
             | samtools sort -o {output.sorted_bam} - > {log.stdout} 2>> {log.stderr}; 
-        samtools view -b -f 3 -F 4 -o {output.filtered_bam} {output.sorted_bam} >> {log.stdout} 2>> {log.stderr};
+        samtools view -b -f 3 -F 4 -q {params.min_mapping_quality} -o {output.filtered_bam} {output.sorted_bam} >> {log.stdout} 2>> {log.stderr};
         samtools index {output.filtered_bam} >> {log.stdout} 2>> {log.stderr};
         """
 
@@ -288,25 +289,6 @@ rule create_consensus:
         >> {log.stdout} 2>> {log.stderr};
         """
 
-# rule call_variants_lofreq:
-#     input:
-#         bam="results/{sample}/mapping/{sample}_{reference}.bam",
-#         ref=_reference_fasta
-#     output:
-#         "results/{sample}/variants/{sample}_{reference}.lofreq.vcf"
-#     params:
-#         min_bq=config.get("min_base_quality", 20),
-#         min_cov=config.get("min_coverage", 10),
-#         min_mapq=config.get("min_mapping_quality", 30),
-#         min_freq=config.get("min_allele_frequency", 0.8)
-#     conda:
-#         ENV_CORE
-#     shell:
-#         """
-#         mkdir -p results/{wildcards.sample}/variants
-#         lofreq call-parallel --pp-threads 1 -Q {params.min_bq} -q {params.min_mapq} -C {params.min_cov} -f {input.ref} -o {output} {input.bam}
-#         """
-
 
 # rule call_variants_ivar:
 #     input:
@@ -327,6 +309,29 @@ rule create_consensus:
 #             ivar variants -p results/{wildcards.sample}/variants/{wildcards.sample}_{wildcards.reference}.ivar -q {params.min_quality} -t {params.min_freq} -m {params.min_depth} -r {input.ref}
 #         mv results/{wildcards.sample}/variants/{wildcards.sample}_{wildcards.reference}.ivar.tsv {output}
 #         """
+
+
+# rule call_variants_lofreq:
+#     input:
+#         bam="results/{sample}/mapping/{sample}_{reference}.bam",
+#         ref=_reference_fasta
+#     output:
+#         "results/{sample}/variants/{sample}_{reference}.lofreq.vcf"
+#     params:
+#         min_bq=config.get("min_base_quality", 20),
+#         min_cov=config.get("min_coverage", 10),
+#         min_mapq=config.get("min_mapping_quality", 30),
+#         min_freq=config.get("min_allele_frequency", 0.8)
+#     conda:
+#         ENV_CORE
+#     shell:
+#         """
+#         mkdir -p results/{wildcards.sample}/variants
+#         lofreq call-parallel --pp-threads 1 -Q {params.min_bq} -q {params.min_mapq} -C {params.min_cov} -f {input.ref} -o {output} {input.bam}
+#         """
+
+
+
 
 
 
