@@ -138,7 +138,7 @@ rule all:
         # [_append_res_dir(f"{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam") for sample, reference in RUN_KEYS]
         [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
         [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.tsv") for sample, reference in RUN_KEYS],
-        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.vcf") for sample, reference in RUN_KEYS[:1]]
+        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.vcf") for sample, reference in RUN_KEYS[:]]
 
 
 
@@ -333,20 +333,22 @@ rule transform_ivar_to_vcf:
         temp_fasta=_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta"),
     output:        
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.vcf")
-    # log:
-    #     stdout="logs/{sample}/transform_ivar_to_vcf_{reference}.stdout.log",
-    #     stderr="logs/{sample}/transform_ivar_to_vcf_{reference}.stderr.log"
+    log:
+        stdout="logs/{sample}/transform_ivar_to_vcf_{reference}.stdout.log",
+        stderr="logs/{sample}/transform_ivar_to_vcf_{reference}.stderr.log"
     container:
         'docker://community.wave.seqera.io/library/biopython_matplotlib_pandas_python_pruned:46d87e2ad1f8a063'
     params:
-        ref_name= lambda wildcards: wildcards.reference
+        ref_name= lambda wildcards: wildcards.reference,
+        # --ignore_strand_bias for amplicon runs
+        ignore_strand_bias = lambda wildcards: "--ignore_strand_bias" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     shell:
         """
-        pwd;
-        ls -l  /mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed/variants/1545554-HSV2_S82_not_trimmed_HSV_2_UL23.ivar.tsv;
-        ls -l /mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed/variants/;
-        python external_scripts/ivar_variants_to_vcf.py {input.ivar_tsv} {output.vcf} --fasta {input.temp_fasta}
+        python external_scripts/ivar_variants_to_vcf.py {input.ivar_tsv} {output.vcf} --fasta {input.temp_fasta} \
+        {params.ignore_strand_bias} > {log.stdout} 2> {log.stderr};
         """
+
+
 
 # link to script for transforming ivar output to vcf format:
 # https://github.com/nf-core/viralrecon/blob/fa23078485cb75e96add952045b2b897aab61b42/bin/ivar_variants_to_vcf.py
