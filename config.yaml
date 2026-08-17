@@ -3,6 +3,7 @@
 # Optional sample sheet column:
 # bed
 sample_sheet: sample_sheet.csv
+res_dir: /mnt/common/researchers/udo_gieraths/galaxy_port_data/results
 
 # fastp parameters
 min_base_quality: 20

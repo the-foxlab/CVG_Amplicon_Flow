@@ -1,5 +1,7 @@
 configfile: "config.yaml"
 
+from pathlib import Path
+
 import pandas as pd
 from Bio import SeqIO
 
@@ -112,7 +114,12 @@ def _load_samples(cfg):
 def _reference_fasta(wildcards):
     return SAMPLES_MAP[wildcards.sample]["reference_fasta"]
 
+def _append_res_dir(p):
+    return str(Path(RES_DIR) / p)
 
+
+RES_DIR = config.get('res_dir')
+print(f"RES_DIR: {RES_DIR}")
 SAMPLES_MAP = _load_samples(config)
 SAMPLES = sorted(SAMPLES_MAP.keys())
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
@@ -126,10 +133,14 @@ ENV_DENOVO = "requirements/requirements-denovo.yaml"
 
 rule all:
     input:
-        expand("results/{sample}/qc/{sample}_R1.fastq.gz", sample=SAMPLES),
-        expand("results/{sample}/qc/{sample}_R2.fastq.gz", sample=SAMPLES),
-        # [f"results/{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam" for sample, reference in RUN_KEYS]
-        [f"results/{sample}/consensus/{sample}_{reference}_consensus.fa" for sample, reference in RUN_KEYS]
+        expand(_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"), sample=SAMPLES),
+        expand(_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"), sample=SAMPLES),
+        # [_append_res_dir(f"{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam") for sample, reference in RUN_KEYS]
+        [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
+        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.tsv") for sample, reference in RUN_KEYS],
+        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.vcf") for sample, reference in RUN_KEYS[:1]]
+
+
 
 
    
@@ -137,7 +148,7 @@ rule prepare_reference:
     input:
         ref=_reference_fasta
     output:
-        flag="results/{sample}/flags/reference_prepared.done"
+        flag=_append_res_dir("{sample}/flags/reference_prepared.done")
     log:
         stdout="logs/{sample}/prepare_reference.stdout.log",
         stderr="logs/{sample}/prepare_reference.stderr.log"
@@ -155,10 +166,10 @@ rule qc_trim:
         r1=lambda wildcards: SAMPLES_MAP[wildcards.sample]["r1"],
         r2=lambda wildcards: SAMPLES_MAP[wildcards.sample]["r2"]
     output:
-        r1="results/{sample}/qc/{sample}_R1.fastq.gz",
-        r2="results/{sample}/qc/{sample}_R2.fastq.gz",
-        html="results/{sample}/qc/{sample}.html",
-        json="results/{sample}/qc/{sample}.json"
+        r1=_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"),
+        r2=_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"),
+        html=_append_res_dir("{sample}/qc/{sample}.html"),
+        json=_append_res_dir("{sample}/qc/{sample}.json")
     log:
         stdout="logs/{sample}/qc_trim.stdout.log",
         stderr="logs/{sample}/qc_trim.stderr.log"
@@ -181,13 +192,13 @@ rule qc_trim:
 
 rule map_reads:
     input:
-        r1="results/{sample}/qc/{sample}_R1.fastq.gz",
-        r2="results/{sample}/qc/{sample}_R2.fastq.gz",
-        ref_flag="results/{sample}/flags/reference_prepared.done",
+        r1=_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"),
+        r2=_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"),
+        ref_flag=_append_res_dir("{sample}/flags/reference_prepared.done"),
         ref=_reference_fasta,
     output:
-        sorted_bam="results/{sample}/mapping/{sample}.sorted.bam",
-        filtered_bam="results/{sample}/mapping/{sample}.sorted.filtered.bam"
+        sorted_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.bam"),
+        filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam")
     log:
         stdout="logs/{sample}/map_reads.stdout.log",
         stderr="logs/{sample}/map_reads.stderr.log"
@@ -209,11 +220,11 @@ rule map_reads:
 
 rule split_bam_by_reference:
     input:
-        filtered_bam="results/{sample}/mapping/{sample}.sorted.filtered.bam"
+        filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam")
     output:
-        temp_bam=temp("results/{sample}/mapping/{sample}_{reference}.sorted.filtered.temp.bam"),
-        bam="results/{sample}/mapping/{sample}_{reference}.sorted.filtered.bam",
-        bai="results/{sample}/mapping/{sample}_{reference}.sorted.filtered.bam.bai",
+        temp_bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.temp.bam")),
+        bam=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam"),
+        bai=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam.bai"),
     log: 
         stdout="logs/{sample}/split_bam_{reference}.stdout.log",
         stderr="logs/{sample}/split_bam_{reference}.stderr.log"
@@ -234,17 +245,17 @@ rule split_bam_by_reference:
 
 rule trim_bam:
     input:
-        split_bam="results/{sample}/mapping/{sample}_{reference}.sorted.filtered.bam",
+        split_bam=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam"),
     output:
-        temp_bam=temp("results/{sample}/mapping/{sample}_{reference}.temp.bam"),
-        bam_trimmed="results/{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam",
-        bai_trimmed="results/{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam.bai"
+        temp_bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.temp.bam")),
+        bam_trimmed=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam"),
+        bai_trimmed=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam.bai")
     log: 
         stdout="logs/{sample}/trim_bam{reference}.stdout.log",
         stderr="logs/{sample}/trim_bam{reference}.stderr.log"
     params:
         bed_fn = lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
-        prefix = lambda wildcards: f"results/{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.temp.bam",
+        prefix = lambda wildcards: _append_res_dir(f"{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.temp.bam"),
         min_len_after_trimming = config['min_length_after_trimming']
     conda:
         'requirements/requirements_aln.yaml'
@@ -260,23 +271,23 @@ rule trim_bam:
 
 
 def get_bam_input(wildcards):
-    if  SAMPLES_MAP[wildcards.sample]["bed"]:
-        bam_path = f"results/{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.sorted.filtered.trimmed.bam"
+    if SAMPLES_MAP[wildcards.sample]["bed"]:
+        bam_path = _append_res_dir(f"{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.sorted.filtered.trimmed.bam")
     else:
-        bam_path = f"results/{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.sorted.filtered.bam"   
+        bam_path = _append_res_dir(f"{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.sorted.filtered.bam")
     return bam_path
 
 
 rule create_consensus:
     input:
-        bam= get_bam_input
+        bam=get_bam_input
     output:
-        "results/{sample}/consensus/{sample}_{reference}_consensus.fa"
+        _append_res_dir("{sample}/consensus/{sample}_{reference}_consensus.fa")
     params:
         min_quality=config.get("min_variant_quality", 20),
         min_freq=config.get("min_consensus_frequency", 0.8),
         min_depth=config.get("min_depth", 20),
-        prefix = lambda wildcards: f"results/{wildcards.sample}/consensus/{wildcards.sample}_{wildcards.reference}_consensus"
+        prefix = lambda wildcards: _append_res_dir(f"{wildcards.sample}/consensus/{wildcards.sample}_{wildcards.reference}_consensus")
     log:
         stdout="logs/{sample}/create_consensus_{reference}.stdout.log",
         stderr="logs/{sample}/create_consensus_{reference}.stderr.log"
@@ -286,30 +297,59 @@ rule create_consensus:
         """
         samtools mpileup -A -a -d 0 -Q 0 {input.bam} 2> {log.stderr} | \
         ivar consensus -p {params.prefix} -q {params.min_quality} -t {params.min_freq} -c 0.75 -m {params.min_depth} -n N \
-        >> {log.stdout} 2>> {log.stderr};
+        > {log.stdout} 2>> {log.stderr};
         """
 
 
-# rule call_variants_ivar:
-#     input:
-#         bam="results/{sample}/mapping/{sample}_{reference}.bam",
-#         ref=_reference_fasta
-#     output:
-#         "results/{sample}/variants/{sample}_{reference}.ivar.tsv"
-#     params:
-#         min_quality=config.get("min_variant_quality", 20),
-#         min_freq=config.get("min_allele_frequency", 0.8),
-#         min_depth=config.get("min_depth", 20)
-#     conda:
-#         ENV_CORE
-#     shell:
-#         """
-#         mkdir -p results/{wildcards.sample}/variants
-#         samtools mpileup -A -d 0 -B -Q 0 {input.bam} | \
-#             ivar variants -p results/{wildcards.sample}/variants/{wildcards.sample}_{wildcards.reference}.ivar -q {params.min_quality} -t {params.min_freq} -m {params.min_depth} -r {input.ref}
-#         mv results/{wildcards.sample}/variants/{wildcards.sample}_{wildcards.reference}.ivar.tsv {output}
-#         """
+rule call_variants_ivar:
+    input:
+        bam=get_bam_input,
+        ref=_reference_fasta
+    output:
+        temp_fasta=_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta"),
+        tsv=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv")
+    params:
+        min_quality=config.get("min_variant_quality", 20),
+        min_freq=config.get("min_allele_frequency", 0.8),
+        min_depth=config.get("min_depth", 20),
+        ivar_prefix=lambda wildcards: _append_res_dir(f"{wildcards.sample}/variants/{wildcards.sample}_{wildcards.reference}.ivar"),
+        ref_name= lambda wildcards: wildcards.reference
+    log:
+        stdout="logs/{sample}/call_variants_ivar_{reference}.stdout.log",
+        stderr="logs/{sample}/call_variants_ivar_{reference}.stderr.log"
+    conda:
+        'requirements/requirements_aln.yaml'
+    shell:
+        """
+        samtools faidx {input.ref} {params.ref_name} > {output.temp_fasta} 2> {log.stderr};
+        samtools mpileup -A -d 0 -B -Q 0 --reference {output.temp_fasta} {input.bam} 2>> {log.stderr} | \
+            ivar variants -p {params.ivar_prefix} -q {params.min_quality} -t {params.min_freq} -m {params.min_depth} -r {input.ref} \
+            > {log.stdout} 2>> {log.stderr};                
+        """
 
+rule transform_ivar_to_vcf:
+    input:
+        ivar_tsv=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv"),
+        temp_fasta=_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta"),
+    output:        
+        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.vcf")
+    # log:
+    #     stdout="logs/{sample}/transform_ivar_to_vcf_{reference}.stdout.log",
+    #     stderr="logs/{sample}/transform_ivar_to_vcf_{reference}.stderr.log"
+    container:
+        'docker://community.wave.seqera.io/library/biopython_matplotlib_pandas_python_pruned:46d87e2ad1f8a063'
+    params:
+        ref_name= lambda wildcards: wildcards.reference
+    shell:
+        """
+        pwd;
+        ls -l  /mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed/variants/1545554-HSV2_S82_not_trimmed_HSV_2_UL23.ivar.tsv;
+        ls -l /mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed/variants/;
+        python external_scripts/ivar_variants_to_vcf.py {input.ivar_tsv} {output.vcf} --fasta {input.temp_fasta}
+        """
+
+# link to script for transforming ivar output to vcf format:
+# https://github.com/nf-core/viralrecon/blob/fa23078485cb75e96add952045b2b897aab61b42/bin/ivar_variants_to_vcf.py
 
 # rule call_variants_lofreq:
 #     input:
