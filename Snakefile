@@ -119,29 +119,15 @@ def _append_res_dir(p):
 
 
 RES_DIR = config.get('res_dir')
-print(f"RES_DIR: {RES_DIR}")
 SAMPLES_MAP = _load_samples(config)
 SAMPLES = sorted(SAMPLES_MAP.keys())
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
 
 
-GFF = config.get("gff")
-ENV_CORE = "requirements/requirements-core.yaml"
-ENV_REF_ANNOT = "requirements/requirements-reference-annotation.yaml"
-ENV_DENOVO = "requirements/requirements-denovo.yaml"
-
-
 rule all:
     input:
-        expand(_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"), sample=SAMPLES),
-        expand(_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"), sample=SAMPLES),
-        # [_append_res_dir(f"{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam") for sample, reference in RUN_KEYS]
         [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
-        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.tsv") for sample, reference in RUN_KEYS],
-        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.vcf") for sample, reference in RUN_KEYS[:]]
-
-
-
+        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf") for sample, reference in RUN_KEYS[:]]
 
    
 rule prepare_reference:
@@ -349,32 +335,46 @@ rule transform_ivar_to_vcf:
         """
 
 
+rule filter_variants_lofreq:
+    input:
+        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.vcf")
+    output:
+        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf")
+    params:
+        min_cov=config.get("min_coverage", 10),
+        min_freq=config.get("min_allele_frequency_variant", 0.1)
+    conda:
+        "requirements/requirements_lofreq.yaml"
+    log:
+        stdout="logs/{sample}/filter_variants_lofreq_{reference}.stdout.log",
+        stderr="logs/{sample}/filter_variants_lofreq_{reference}.stderr.log"
+    shell:
+        """
+        lofreq filter -i {input.vcf} --no-defaults --verbose -v {params.min_cov} -V 0 -a 0.1 -A 0.0 -o {output.vcf} > {log.stdout} 2> {log.stderr};
+        """
 
-# link to script for transforming ivar output to vcf format:
-# https://github.com/nf-core/viralrecon/blob/fa23078485cb75e96add952045b2b897aab61b42/bin/ivar_variants_to_vcf.py
-
-# rule call_variants_lofreq:
-#     input:
-#         bam="results/{sample}/mapping/{sample}_{reference}.bam",
-#         ref=_reference_fasta
-#     output:
-#         "results/{sample}/variants/{sample}_{reference}.lofreq.vcf"
-#     params:
-#         min_bq=config.get("min_base_quality", 20),
-#         min_cov=config.get("min_coverage", 10),
-#         min_mapq=config.get("min_mapping_quality", 30),
-#         min_freq=config.get("min_allele_frequency", 0.8)
-#     conda:
-#         ENV_CORE
-#     shell:
-#         """
-#         mkdir -p results/{wildcards.sample}/variants
-#         lofreq call-parallel --pp-threads 1 -Q {params.min_bq} -q {params.min_mapq} -C {params.min_cov} -f {input.ref} -o {output} {input.bam}
-#         """
-
-
-
-
+rule bcftools_normalize_variants:
+    input:
+        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf"),
+        ref=_reference_fasta
+    output:
+        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf")
+    params:
+        args="--check-ref w --site-win 1000 --sort pos --output-type 'v'"
+    conda:
+        "requirements/requirements_bcftools.yaml"
+    threads:
+        4
+    log:
+        stdout="logs/{sample}/filter_variants_lofreq_{reference}.stdout.log",
+        stderr="logs/{sample}/filter_variants_lofreq_{reference}.stderr.log"
+    shell:
+        """
+        bgzip -c {input.vcf} > {input.vcf}.gz 2> {log.stderr};
+        bcftools index {input.vcf}.gz > {log.stdout} 2>> {log.stderr};
+        bcftools norm --fasta-ref {input.ref} {params.args} \
+        --threads {threads} {input.vcf}.gz > {output.vcf} 2>> {log.stderr};
+        """
 
 
 
