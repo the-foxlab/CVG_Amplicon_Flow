@@ -67,11 +67,10 @@ The workflow is driven by a CSV sample sheet (path set in `config.yaml`).
 
 Example:
 
-```csv
-sample,reference_fasta,bed,r1,r2
-sample1,/path/to/ref.fasta,/path/to/primers.bed,/path/to/R1.fastq.gz,/path/to/R2.fastq.gz
-sample2,/path/to/ref.fasta,,/path/to/R1.fastq.gz,/path/to/R2.fastq.gz
-```
+| sample | reference_fasta | bed | r1 | r2 |
+|---|---|---|---|---|
+| sample1_trimmed | /data/refs/ref.fasta | /data/beds/primers.bed | /data/fastqs/sample1_R1.fastq.gz | /data/fastqs/sample1_R2.fastq.gz |
+| sample1_not_trimmed | /data/refs/ref.fasta | | /data/fastqs/sample1_R1.fastq.gz | /data/fastqs/sample1_R2.fastq.gz |
 
 ## Configuration
 
@@ -113,11 +112,19 @@ snakemake -n -p
 
 # Standard run on CVG workstation:
 # Replace <data_dir> with the path to your data directory (must contain fastqs, reference FASTAs, and BED files)
-snakemake --cores 60 --use-conda --verbose --conda-frontend conda  --use-singularity \
-    --singularity-args "--bind <data_dir>:<data_dir>"
+snakemake --cores 60 --use-conda --verbose --conda-frontend conda  --use-singularity --singularity-args "--bind <data_dir>:<data_dir>"
 
-# Plot DAG (requires requirements_snakemake_dag.yaml environment)
-snakemake --dag | dot -Tsvg > dag.svg
 ```
 
-> **Note:** The explicit `--singularity-args --bind` is required on this infrastructure because implicit directory mounting is not available. Set `<data_dir>` to the parent directory containing all your input data (fastqs, reference FASTAs, BED files). This path must match the directory paths used in `config.yaml` and the sample sheet.
+> **Note:** The explicit `--singularity-args --bind` is required on the CVG workstation because implicit directory mounting is not available. Set `<data_dir>` to the parent directory containing all your input data (fastqs, reference FASTAs, BED files). This path must match the directory paths used in `config.yaml` and the sample sheet.
+
+## Workflow DAG
+
+The DAG below shows an exemplary run using the sample sheet provided. The same sequencing data is processed twice — once with amplicon primer trimming and once without — by listing the sample under two different names and omitting the `bed` column for the untrimmed case. Both samples are mapped against a multi-FASTA reference containing the HSV-2 genes UL23 and UL30, illustrating the per-reference job expansion and the conditional primer trimming branch.
+
+| sample | reference_fasta | bed | r1 | r2 |
+|---|---|---|---|---|
+| 1545554-HSV2_S82_trimmed | HSV_2_both.fasta | HSV_2_both.bed | 1545554-HSV2_S82_L001_R1_001.fastq.gz | 1545554-HSV2_S82_L001_R2_001.fastq.gz |
+| 1545554-HSV2_S82_not_trimmed | HSV_2_both.fasta | | 1545554-HSV2_S82_L001_R1_001.fastq.gz | 1545554-HSV2_S82_L001_R2_001.fastq.gz |
+
+![Workflow DAG](dag.svg)
