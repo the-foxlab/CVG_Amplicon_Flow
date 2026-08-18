@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+Downloaded this script from the nf-core/viralrecon repository.
+Version: nf-core/viralrecon v3.0.0 - Waterdog Hibiscus
+Permalink: https://raw.githubusercontent.com/nf-core/viralrecon/fa23078485cb75e96add952045b2b897aab61b42/bin/ivar_variants_to_vcf.py
+"""
+
 import os
 import sys
 import errno
