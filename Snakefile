@@ -115,7 +115,7 @@ def _reference_fasta(wildcards):
     return SAMPLES_MAP[wildcards.sample]["reference_fasta"]
 
 def _bed_file(wildcards):
-    return SAMPLES_MAP[wildcards.sample]["bed"]
+    return SAMPLES_MAP[wildcards.sample].get("bed") or ""
 
 def _append_res_dir(p):
     return str(Path(RES_DIR) / p)
@@ -141,13 +141,14 @@ rule mask_reference:
         stdout="logs/{sample}/mask_reference.stdout.log",
         stderr="logs/{sample}/mask_reference.stderr.log"
     params:
-        bed=_bed_file
+        bed=_bed_file,
+        script=str(Path(workflow.basedir) / "mask_refs.py")
     conda:
         "requirements/requirements_mask_refs.yaml"
     shell:
         """
         if [ -n "{params.bed}" ]; then
-            python mask_refs.py --fasta {input.ref} --bed {params.bed} --output {output.ref} \
+            python {params.script} --fasta {input.ref} --bed {params.bed} --output {output.ref} \
                 > {log.stdout} 2> {log.stderr}
         else
             cp {input.ref} {output.ref} > {log.stdout} 2> {log.stderr}
