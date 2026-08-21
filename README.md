@@ -98,6 +98,7 @@ Each rule uses a dedicated conda environment defined under `requirements/`:
 | File | Used by |
 |---|---|
 | `requirements_aln.yaml` | bwa, samtools, ivar |
+| `requirements_mask_refs.yaml` | Biopython for `mask_refs.py` |
 | `requirements_fastp.yaml` | fastp |
 | `requirements_lofreq.yaml` | lofreq |
 | `requirements_bcftools.yaml` | bcftools, bgzip |

@@ -114,6 +114,9 @@ def _load_samples(cfg):
 def _reference_fasta(wildcards):
     return SAMPLES_MAP[wildcards.sample]["reference_fasta"]
 
+def _bed_file(wildcards):
+    return SAMPLES_MAP[wildcards.sample]["bed"]
+
 def _append_res_dir(p):
     return str(Path(RES_DIR) / p)
 
@@ -129,10 +132,32 @@ rule all:
         [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
         [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf") for sample, reference in RUN_KEYS[:]]
 
-   
-rule prepare_reference:
+rule mask_reference:
     input:
         ref=_reference_fasta
+    output:
+        ref=_append_res_dir("{sample}/references/{sample}.masked.fasta")
+    log:
+        stdout="logs/{sample}/mask_reference.stdout.log",
+        stderr="logs/{sample}/mask_reference.stderr.log"
+    params:
+        bed=_bed_file
+    conda:
+        "requirements/requirements_mask_refs.yaml"
+    shell:
+        """
+        if [ -n "{params.bed}" ]; then
+            python mask_refs.py --fasta {input.ref} --bed {params.bed} --output {output.ref} \
+                > {log.stdout} 2> {log.stderr}
+        else
+            cp {input.ref} {output.ref} > {log.stdout} 2> {log.stderr}
+        fi
+        """
+
+
+rule prepare_reference:
+    input:
+        ref=_append_res_dir("{sample}/references/{sample}.masked.fasta")
     output:
         flag=_append_res_dir("{sample}/flags/reference_prepared.done")
     log:
@@ -181,7 +206,7 @@ rule map_reads:
         r1=_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"),
         r2=_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"),
         ref_flag=_append_res_dir("{sample}/flags/reference_prepared.done"),
-        ref=_reference_fasta,
+        ref=_append_res_dir("{sample}/references/{sample}.masked.fasta"),
     output:
         sorted_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.bam"),
         filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam")
@@ -290,7 +315,7 @@ rule create_consensus:
 rule call_variants_ivar:
     input:
         bam=get_bam_input,
-        ref=_reference_fasta
+        ref=_append_res_dir("{sample}/references/{sample}.masked.fasta")
     output:
         temp_fasta=_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta"),
         tsv=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv")
@@ -356,7 +381,7 @@ rule filter_variants_lofreq:
 rule bcftools_normalize_variants:
     input:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf"),
-        ref=_reference_fasta
+        ref=_append_res_dir("{sample}/references/{sample}.masked.fasta")
     output:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf")
     params:
