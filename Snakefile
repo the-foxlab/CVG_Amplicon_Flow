@@ -1,10 +1,46 @@
 configfile: "config.yaml"
 
 from pathlib import Path
+import hashlib
 
 import pandas as pd
 from Bio import SeqIO
 
+
+def hashfile(file_names):
+
+    # A arbitrary (but fixed) buffer size
+    # 65536 = 65536 bytes = 64 kilobytes
+    BUF_SIZE = 65536
+
+    # Initializing the sha256() method
+    sha256 = hashlib.sha256()
+
+    # Opening the file provided as the first 
+    # commandline argument
+    for file in file_names:
+        with open(file, 'rb') as f:
+            while True:
+                # reading data = BUF_SIZE from the 
+                # file and saving it in a variable
+                data = f.read(BUF_SIZE)
+
+                # True if eof = 1
+                if not data:
+                    break
+
+                # Passing that data to that sh256 hash 
+                # function (updating the function with that data)
+                sha256.update(data)
+
+    # sha256.hexdigest() hashes all the input data passed
+    # to the sha256() via sha256.update()
+    # Acts as a finalize method, after which 
+    # all the input data gets hashed
+    # hexdigest() hashes the data, and returns 
+    # the output in hexadecimal format
+    return sha256.hexdigest()
+  
 
 def _is_missing(value):
     text = str(value).strip()
@@ -97,6 +133,7 @@ def _load_samples_from_sheet(sample_sheet):
             "r1": r1,
             "r2": r2,
             "references": effective_references,
+            "reference_hash": hashfile([reference_fasta]) if _is_missing(bed) else hashfile([reference_fasta, bed]),
         }
 
     if not samples:
@@ -115,43 +152,75 @@ def _reference_fasta(wildcards):
     return SAMPLES_MAP[wildcards.sample]["reference_fasta"]
 
 
-def _masked_reference_fasta(wildcards):
-    if SAMPLES_MAP[wildcards.sample]["bed"]:
-        return _append_res_dir(f"{wildcards.sample}/references/{wildcards.sample}.masked.fasta")
-    return SAMPLES_MAP[wildcards.sample]["reference_fasta"]
+def _all_bwa_files(wildcards):
+    sample = SAMPLES_MAP[wildcards.sample]
+    hash_value = sample["reference_hash"]
 
+    ref_type = "masked" if sample["bed"] else "unmasked"
 
+    ref = _append_res_dir(
+        f"references/{hash_value}/{hash_value}.{ref_type}.fasta"
+    )
+
+    return {
+        "ref": ref,
+        "ref_fai": f"{ref}.fai",
+        "ref_amb": f"{ref}.amb",
+        "ref_ann": f"{ref}.ann",
+        "ref_bwt": f"{ref}.bwt",
+        "ref_pac": f"{ref}.pac",
+        "ref_sa": f"{ref}.sa",
+    }
+
+    
 def _bed_file(wildcards):
     return SAMPLES_MAP[wildcards.sample].get("bed") or ""
-
-
 def _append_res_dir(p):
     return str(Path(RES_DIR) / p)
+
+def _masked_reference_fasta(wildcards):
+    sample = SAMPLES_MAP[wildcards.sample]
+    hash_value = sample["reference_hash"]
+    ref_type = "masked" if sample["bed"] else "unmasked"
+    return _append_res_dir(f"references/{hash_value}/{hash_value}.{ref_type}.fasta")
 
 
 RES_DIR = config.get('res_dir')
 SAMPLES_MAP = _load_samples(config)
 SAMPLES = sorted(SAMPLES_MAP.keys())
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
+HASH_to_files = {SAMPLES_MAP[sample]["reference_hash"]: [SAMPLES_MAP[sample].get("reference_fasta"), 
+                                                        SAMPLES_MAP[sample].get("bed")] for sample in SAMPLES}
+
+wildcard_constraints:
+    ref_type="masked|unmasked"
 
 
 rule all:
     input:
-        [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
-        [_append_res_dir(f"{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf") for sample, reference in RUN_KEYS[:]]
+        # [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
+        [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
+        # [_append_res_dir(f"{sample}/visualization/{sample}_{reference}.html") for sample, reference in RUN_KEYS]
+        # [_append_res_dir(f"{sample}/mapping/{sample}.sorted.filtered.bam") for sample in SAMPLES]
 
+def _get_masking_input(wildcards):
+    [fasta_fn, bed_fn] = HASH_to_files[wildcards.hash_value]
+    assert bed_fn, (
+        f"Reference {fasta_fn} has no BED file, "
+        "but mask_reference was triggered"
+    )
+    return { "ref": fasta_fn, "bed": bed_fn }
 
 rule mask_reference:
     input:
-        ref=_reference_fasta,
-        bed=_bed_file
+        unpack(_get_masking_input)
     output:
-        ref=_append_res_dir("{sample}/references/{sample}.masked.fasta")
+        ref = _append_res_dir("references/{hash_value}/{hash_value}.masked.fasta")
     log:
-        stdout="logs/{sample}/mask_reference.stdout.log",
-        stderr="logs/{sample}/mask_reference.stderr.log"
+        stdout="logs/mask_reference/{hash_value}.stdout.log",
+        stderr="logs/mask_reference/{hash_value}.stderr.log"
     params:
-        script=str(Path(workflow.basedir) / "mask_refs.py")
+        script=str(Path(workflow.basedir) / "scripts/mask_refs.py")
     conda:
         "requirements/requirements_mask_refs.yaml"
     shell:
@@ -160,23 +229,46 @@ rule mask_reference:
             > {log.stdout} 2> {log.stderr}
         """
 
+def _get_reference_fasta(wildcards):
+    [fasta_fn, bed_fn] = HASH_to_files[wildcards.hash_value]
+    assert not bed_fn, f"Reference {wildcards.hash_value} has a BED file, but the rule mask_reference is not triggered"
+    return fasta_fn
+
+rule copy_reference:
+    input:
+        ref=_get_reference_fasta,
+    output:
+        ref = _append_res_dir("references/{hash_value}/{hash_value}.unmasked.fasta")
+    log:
+        stdout="logs/copy_reference/{hash_value}.stdout.log",
+        stderr="logs/copy_reference/{hash_value}.stderr.log"
+    shell:
+        """
+        cp {input.ref} {output.ref} > {log.stdout} 2> {log.stderr}
+        """
+
 
 rule prepare_reference:
     input:
-        ref=_masked_reference_fasta
+        ref = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta")
     output:
-        flag=_append_res_dir("{sample}/flags/reference_prepared.done")
+        ref_fai = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.fai"),
+        ref_amb = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.amb"),
+        ref_ann = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.ann"),
+        ref_bwt = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.bwt"),
+        ref_pac = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.pac"),
+        ref_sa = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.sa"),
     log:
-        stdout="logs/{sample}/prepare_reference.stdout.log",
-        stderr="logs/{sample}/prepare_reference.stderr.log"
+        stdout="logs/prepare_reference/{hash_value}.{ref_type}.stdout.log",
+        stderr="logs/prepare_reference/{hash_value}.{ref_type}.stderr.log"
     conda:
         'requirements/requirements_aln.yaml'
     shell:
         """
         samtools faidx {input.ref} > {log.stdout} 2> {log.stderr}
-        bwa index {input.ref} > {log.stdout} 2>> {log.stderr}
-        touch {output.flag}
+        bwa index {input.ref} >> {log.stdout} 2>> {log.stderr}
         """
+
 
 rule qc_trim:
     input:
@@ -209,13 +301,13 @@ rule qc_trim:
 
 rule map_reads:
     input:
+        unpack(_all_bwa_files),
         r1=_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"),
         r2=_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"),
-        ref_flag=_append_res_dir("{sample}/flags/reference_prepared.done"),
-        ref=_masked_reference_fasta,
     output:
         sorted_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.bam"),
-        filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam")
+        filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam"),
+        filtered_bai=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam.bai")
     log:
         stdout="logs/{sample}/map_reads.stdout.log",
         stderr="logs/{sample}/map_reads.stderr.log"
@@ -407,8 +499,21 @@ rule bcftools_normalize_variants:
         --threads {threads} {input.vcf}.gz > {output.vcf} 2>> {log.stderr};
         """
 
-
-
+# rule visualize_bam_bamdash:
+#     input:
+#         bam=get_bam_input,
+#         bai=lambda wildcards: f"{get_bam_input(wildcards)}.bai"
+#     output:
+#         html=_append_res_dir("{sample}/visualization/{sample}_{reference}.html")
+#     log:
+#         stdout="logs/{sample}/visualize_bam_bamdash_{reference}.stdout.log",
+#         stderr="logs/{sample}/visualize_bam_bamdash_{reference}.stderr.log"
+#     conda:
+#         "requirements/requirements_bamdash.yaml"
+#     shell:
+#         """
+#         BAMdash --bam {input.bam} --out {output.html} > {log.stdout} 2> {log.stderr}
+#         """
 
 # rule de_novo_assembly:
 #     input:
