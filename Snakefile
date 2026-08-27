@@ -200,7 +200,7 @@ rule all:
     input:
         [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
         [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
-        # [_append_res_dir(f"{sample}/visualization/{sample}_{reference}.html") for sample, reference in RUN_KEYS]
+        [_append_res_dir(f"{sample}/visualization/{sample}_{reference}/{sample}_{reference}.html") for sample, reference in RUN_KEYS]
         # [_append_res_dir(f"{sample}/mapping/{sample}.sorted.filtered.bam") for sample in SAMPLES]
 
 def _get_masking_input(wildcards):
@@ -499,57 +499,24 @@ rule bcftools_normalize_variants:
         --threads {threads} {input.vcf}.gz > {output.vcf} 2>> {log.stderr};
         """
 
-# rule visualize_bam_bamdash:
-#     input:
-#         bam=get_bam_input,
-#         bai=lambda wildcards: f"{get_bam_input(wildcards)}.bai"
-#     output:
-#         html=_append_res_dir("{sample}/visualization/{sample}_{reference}.html")
-#     log:
-#         stdout="logs/{sample}/visualize_bam_bamdash_{reference}.stdout.log",
-#         stderr="logs/{sample}/visualize_bam_bamdash_{reference}.stderr.log"
-#     conda:
-#         "requirements/requirements_bamdash.yaml"
-#     shell:
-#         """
-#         BAMdash --bam {input.bam} --out {output.html} > {log.stdout} 2> {log.stderr}
-#         """
-
-# rule de_novo_assembly:
-#     input:
-#         r1="results/{sample}/qc/{sample}_R1.fastq.gz",
-#         r2="results/{sample}/qc/{sample}_R2.fastq.gz"
-#     output:
-#         "results/{sample}/assembly/{sample}_contigs.fasta"
-#     params:
-#         outdir="results/{sample}/assembly/spades"
-#     shell:
-#         """
-#         mkdir -p {params.outdir}
-#         spades.py -1 {input.r1} -2 {input.r2} -o {params.outdir} --isolate
-#         cp {params.outdir}/contigs.fasta {output}
-#         """
-
-# rule basic_metagenomics:
-#     input:
-#         r1="results/{sample}/qc/{sample}_R1.fastq.gz",
-#         r2="results/{sample}/qc/{sample}_R2.fastq.gz"
-#     output:
-#         "results/{sample}/metagenomics/{sample}.txt"
-#     shell:
-#         """
-#         mkdir -p results/{wildcards.sample}/metagenomics
-#         echo "Placeholder for metagenomic profiling; replace with kraken2 or centrifuge" > {output}
-#         """
-
-# rule build_snpeff_db:
-#     input:
-#         ref="results/{sample}/mapping/{sample}.sorted.bam",
-#         gff=GFF
-#     output:
-#         "results/snpeff/database.done"
-#     shell:
-#         """
-#         mkdir -p results/snpeff
-#         touch {output}
-#         """
+rule visualize_bam_bamdash:
+    input:
+        bam=get_bam_input,
+        bai=lambda wildcards: f"{get_bam_input(wildcards)}.bai",
+    output:
+        html=_append_res_dir("{sample}/visualization/{sample}_{reference}/{sample}_{reference}.html")
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash_{reference}.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash_{reference}.stderr.log")
+    params:
+        ref_id = lambda wildcards: wildcards.reference,
+        out_dir = _append_res_dir("{sample}/visualization/{sample}_{reference}")
+    conda:
+        "requirements/requirements_bamdash.yaml"
+    shell:
+        """
+        mkdir -p {params.out_dir} > {log.stdout} 2> {log.stderr};
+        cd {params.out_dir} >> {log.stdout} 2>> {log.stderr};
+        bamdash --bam {input.bam} -r {params.ref_id} -bs 10  >> {log.stdout} 2>> {log.stderr};
+        mv {params.ref_id}_plot.html {output.html} >> {log.stdout} 2>> {log.stderr}
+        """
