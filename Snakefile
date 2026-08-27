@@ -198,7 +198,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        # [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
+        [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
         [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
         # [_append_res_dir(f"{sample}/visualization/{sample}_{reference}.html") for sample, reference in RUN_KEYS]
         # [_append_res_dir(f"{sample}/mapping/{sample}.sorted.filtered.bam") for sample in SAMPLES]
@@ -449,12 +449,12 @@ rule transform_ivar_to_vcf:
         'docker://community.wave.seqera.io/library/biopython_matplotlib_pandas_python_pruned:46d87e2ad1f8a063'
     params:
         ref_name= lambda wildcards: wildcards.reference,
-        # --ignore_strand_bias for amplicon runs
-        ignore_strand_bias = lambda wildcards: "--ignore_strand_bias" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
+        # --ignore_strand_bias for amplicon runs, for now i always ignore it
+        options = "--ignore_strand_bias"
     shell:
         """
         python external_scripts/ivar_variants_to_vcf.py {input.ivar_tsv} {output.vcf} --fasta {input.temp_fasta} \
-        {params.ignore_strand_bias} > {log.stdout} 2> {log.stderr};
+        {params.options} > {log.stdout} 2> {log.stderr};
         """
 
 
