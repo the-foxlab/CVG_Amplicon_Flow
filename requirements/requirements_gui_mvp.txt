@@ -1,0 +1,5 @@
+biopython==1.88
+pandas==2.3.2
+pydantic==2.11.9
+PyYAML==6.0.2
+pytest==8.4.2

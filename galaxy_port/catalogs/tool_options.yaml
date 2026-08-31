@@ -1,0 +1,280 @@
+tools:
+  fastp:
+    name: fastp
+    category: QC
+    options:
+      qualified_quality_phred:
+        flag: --qualified_quality_phred
+        label: Minimum base quality
+        type: int
+        minimum: 0
+        default: 20
+        legacy_keys:
+          - min_base_quality
+      length_required:
+        flag: --length_required
+        label: Minimum read length
+        type: int
+        minimum: 1
+        default: 30
+        legacy_keys:
+          - min_read_length
+      dont_eval_duplication:
+        flag: --dont_eval_duplication
+        label: Skip duplication-rate evaluation
+        type: bool
+        default: true
+  bwa_mem:
+    name: BWA MEM
+    category: Mapping
+    options:
+      min_score:
+        flag: -T
+        label: Minimum alignment score
+        type: int
+        minimum: 0
+        default: 30
+      header_lines:
+        flag: -h
+        label: Header insert size limit
+        type: int
+        minimum: 0
+        default: 5
+      min_seed_length:
+        flag: -k
+        label: Minimum seed length
+        type: int
+        minimum: 1
+        default: 19
+      band_width:
+        flag: -w
+        label: Band width
+        type: int
+        minimum: 1
+        default: 100
+      mark_shorter_split_hits:
+        flag: -M
+        label: Mark shorter split hits
+        type: bool
+        default: false
+  samtools_view_filter:
+    name: SAMtools view filter
+    category: Mapping
+    options:
+      require_proper_pair:
+        flag: -f
+        label: Require proper-pair bitmask
+        type: int
+        minimum: 0
+        default: 3
+      exclude_flags:
+        flag: -F
+        label: Excluded SAM flag bitmask
+        type: int
+        minimum: 0
+        default: 4
+      min_mapping_quality:
+        flag: -q
+        label: Minimum mapping quality
+        type: int
+        minimum: 0
+        default: 20
+        legacy_keys:
+          - min_mapping_quality
+  ivar_trim:
+    name: iVar trim
+    category: Primer trimming
+    options:
+      trim_offset:
+        flag: -x
+        label: Primer trim offset
+        type: int
+        minimum: 0
+        default: 0
+      keep_no_primer_reads:
+        flag: -e
+        label: Keep reads without primers
+        type: bool
+        default: true
+      min_length:
+        flag: -m
+        label: Minimum read length after trimming
+        type: int
+        minimum: 1
+        default: 50
+        legacy_keys:
+          - min_length_after_trimming
+      min_quality:
+        flag: -q
+        label: Minimum base quality for trimming
+        type: int
+        minimum: 0
+        default: 20
+      sliding_window_width:
+        flag: -s
+        label: Sliding window width
+        type: int
+        minimum: 1
+        default: 4
+  ivar_consensus:
+    name: iVar consensus
+    category: Consensus
+    options:
+      min_quality:
+        flag: -q
+        label: Minimum base quality
+        type: int
+        minimum: 0
+        default: 30
+        legacy_keys:
+          - min_variant_quality
+      min_frequency:
+        flag: -t
+        label: Minimum consensus frequency
+        type: float
+        minimum: 0.0
+        maximum: 1.0
+        default: 0.75
+        legacy_keys:
+          - min_consensus_frequency
+      consensus_frequency_threshold:
+        flag: -c
+        label: Consensus calling threshold
+        type: float
+        minimum: 0.0
+        maximum: 1.0
+        default: 0.75
+      min_depth:
+        flag: -m
+        label: Minimum depth
+        type: int
+        minimum: 0
+        default: 20
+        legacy_keys:
+          - min_depth
+      ambiguous_base:
+        flag: -n
+        label: Ambiguous base output
+        type: string
+        default: N
+  ivar_variants:
+    name: iVar variants
+    category: Variant calling
+    options:
+      min_quality:
+        flag: -q
+        label: Minimum base quality
+        type: int
+        minimum: 0
+        default: 30
+        legacy_keys:
+          - min_variant_quality
+      min_frequency:
+        flag: -t
+        label: Minimum allele frequency
+        type: float
+        minimum: 0.0
+        maximum: 1.0
+        default: 0.8
+        legacy_keys:
+          - min_allele_frequency
+      min_depth:
+        flag: -m
+        label: Minimum depth
+        type: int
+        minimum: 0
+        default: 20
+        legacy_keys:
+          - min_depth
+  lofreq_filter:
+    name: LoFreq filter
+    category: Variant filtering
+    options:
+      no_defaults:
+        flag: --no-defaults
+        label: Disable built-in defaults
+        type: bool
+        default: true
+      verbose:
+        flag: --verbose
+        label: Verbose logging
+        type: bool
+        default: true
+      min_coverage:
+        flag: -v
+        label: Minimum coverage
+        type: int
+        minimum: 0
+        default: 10
+        legacy_keys:
+          - min_coverage
+      max_coverage:
+        flag: -V
+        label: Maximum coverage
+        type: int
+        minimum: 0
+        default: 0
+      min_alt_frequency:
+        flag: -a
+        label: Minimum alternate allele frequency
+        type: float
+        minimum: 0.0
+        maximum: 1.0
+        default: 0.1
+        legacy_keys:
+          - min_allele_frequency_variant
+      min_ref_frequency:
+        flag: -A
+        label: Minimum reference allele frequency
+        type: float
+        minimum: 0.0
+        maximum: 1.0
+        default: 0.0
+  bcftools_norm:
+    name: bcftools norm
+    category: Variant normalization
+    options:
+      check_ref:
+        flag: --check-ref
+        label: Reference checking mode
+        type: enum
+        choices:
+          - w
+          - x
+          - s
+          - e
+        default: w
+      site_window:
+        flag: --site-win
+        label: Site window
+        type: int
+        minimum: 0
+        default: 1000
+      sort_order:
+        flag: --sort
+        label: Sort order
+        type: enum
+        choices:
+          - pos
+          - lex
+        default: pos
+      output_type:
+        flag: --output-type
+        label: Output type
+        type: enum
+        choices:
+          - v
+          - z
+          - b
+          - u
+        default: v
+  bamdash:
+    name: BAMDash
+    category: Visualization
+    options:
+      bin_size:
+        flag: -bs
+        label: Bin size
+        type: int
+        minimum: 1
+        default: 10

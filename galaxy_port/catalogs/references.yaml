@@ -1,0 +1,8 @@
+references:
+  hsv2_both:
+    name: HSV-2 both
+    fasta: /home/udo/shared/researchers/udo_gieraths/galaxy_port_data/refs/HSV_2_both.fasta
+    primer_schemes:
+      hsv2_both:
+        name: HSV-2 both primers
+        bed: /home/udo/shared/researchers/udo_gieraths/galaxy_port_data/beds/HSV_2_both.bed
