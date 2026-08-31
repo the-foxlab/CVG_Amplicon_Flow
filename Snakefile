@@ -201,7 +201,6 @@ rule all:
         [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
         [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
         [_append_res_dir(f"{sample}/visualization/{sample}_{reference}/{sample}_{reference}.html") for sample, reference in RUN_KEYS]
-        # [_append_res_dir(f"{sample}/mapping/{sample}.sorted.filtered.bam") for sample in SAMPLES]
 
 def _get_masking_input(wildcards):
     [fasta_fn, bed_fn] = HASH_to_files[wildcards.hash_value]

@@ -1,131 +1,142 @@
 # Snakemake version of the Galaxy workflow
 
-This is a Snakemake translation of the Galaxy workflow stored in the accompanying `.ga` file. It processes paired-end sequencing data for reference-based viral variant calling and consensus generation, with support for multi-reference FASTA files and optional amplicon primer trimming.
+This repository contains a Snakemake port of the Galaxy workflow in `galaxy_workflow_export.ga` for amplicon-aware, reference-based HSV2 analysis, including per-reference BAMDash visualization outputs.
 
-## Pipeline overview
+## Current pipeline behavior
 
-The pipeline runs the following steps in order:
+The active workflow performs these steps (from preprocessing through variant analysis to final BAMDash report generation):
 
-| Step | Rule | Tool |
+| Step | Rule | Main tools |
 |---|---|---|
-| Quality control & trimming | `qc_trim` | fastp |
-| Reference indexing | `prepare_reference` | samtools, bwa |
-| Read mapping | `map_reads` | bwa mem, samtools |
-| Per-reference BAM splitting | `split_bam_by_reference` | samtools |
-| Amplicon primer trimming (optional) | `trim_bam` | ivar trim |
-| Consensus generation | `create_consensus` | samtools mpileup, ivar consensus |
-| Variant calling | `call_variants_ivar` | samtools mpileup, ivar variants |
-| ivar TSV → VCF conversion | `transform_ivar_to_vcf` | ivar_variants_to_vcf.py (Singularity) |
-| Variant filtering | `filter_variants_lofreq` | lofreq filter |
-| VCF normalization | `bcftools_normalize_variants` | bgzip, bcftools norm |
+| Parse sample sheet, FASTA headers, optional BED targets | Python helpers in `Snakefile` | pandas, Biopython |
+| Create masked reference if BED is present | `mask_reference` | custom `scripts/mask_refs.py` |
+| Copy unmasked reference if no BED is present | `copy_reference` | coreutils |
+| Build BWA/SAMtools indices | `prepare_reference` | bwa, samtools |
+| QC + adapter/quality trimming | `qc_trim` | fastp |
+| Map reads and create filtered BAM | `map_reads` | bwa mem, samtools |
+| Split BAM by reference ID | `split_bam_by_reference` | samtools |
+| Primer trimming on split BAM (only when BED is provided) | `trim_bam` | ivar |
+| Build consensus sequence per reference | `create_consensus` | samtools, ivar |
+| Call variants per reference | `call_variants_ivar` | samtools, ivar |
+| Convert iVar TSV to VCF | `transform_ivar_to_vcf` | `external_scripts/ivar_variants_to_vcf.py` |
+| Filter variants | `filter_variants_lofreq` | lofreq |
+| Normalize variants | `bcftools_normalize_variants` | bcftools, bgzip |
+| Final deliverable: generate BAM visualization HTML | `visualize_bam_bamdash` | bamdash |
 
-### Amplicon mode
+The `all` rule currently requires:
 
-If a `bed` file is provided for a sample, `ivar trim` is run after BAM splitting to remove amplicon primers. The `--ignore_strand_bias` flag is also applied automatically during VCF conversion.
+1. Per-sample/per-reference consensus FASTA files
+2. Per-sample/per-reference normalized VCF files
+3. Per-sample/per-reference BAMDash HTML reports
 
-### Multi-reference support
+## Sample sheet contract
 
-`reference_fasta` may contain multiple sequences. The pipeline:
-1. Maps all reads against the full multi-reference FASTA
-2. Splits the BAM by reference name
-3. Runs all downstream steps (consensus, variant calling) independently per reference
+Required columns:
 
-## Outputs
-
-All outputs are written under `res_dir` (configured in `config.yaml`), organized by sample:
-
-```
-<res_dir>/
-  <sample>/
-    qc/           # fastp output (trimmed reads, HTML/JSON report)
-    mapping/      # BAMs per sample and per reference
-    consensus/    # Per-reference consensus FASTA
-    variants/     # Per-reference ivar TSV, VCF, filtered VCF, normalized VCF
-    flags/        # Checkpoint flags
-```
-
-Logs are written to `logs/<sample>/` relative to the working directory.
-
-## Sample sheet
-
-The workflow is driven by a CSV sample sheet (path set in `config.yaml`).
-
-**Required columns:**
-
-| Column | Description |
+| Column | Meaning |
 |---|---|
-| `sample` | Unique sample identifier |
-| `reference_fasta` | Path to reference FASTA (single or multi-reference) |
-| `r1` | Path to R1 FASTQ (gzipped) |
-| `r2` | Path to R2 FASTQ (gzipped) |
+| `sample` | Sample identifier (must be unique) |
+| `reference_fasta` | Path to FASTA file |
+| `r1` | Path to read 1 FASTQ(.gz) |
+| `r2` | Path to read 2 FASTQ(.gz) |
 
-**Optional columns:**
+Optional column:
 
-| Column | Description |
+| Column | Meaning |
 |---|---|
-| `bed` | Path to BED file with amplicon primer coordinates |
+| `bed` | Primer BED file; enables masking + `trim_bam` branch |
 
-Example:
+Validation performed by the workflow:
+
+1. Duplicate sample names are rejected
+2. FASTA record IDs must be unique and non-empty
+3. If BED is present, BED reference names must be a subset of FASTA IDs
+4. Effective references per sample are BED reference names (if BED exists) or FASTA record IDs
+
+Example format (dummy paths):
 
 | sample | reference_fasta | bed | r1 | r2 |
 |---|---|---|---|---|
-| sample1_trimmed | /data/refs/ref.fasta | /data/beds/primers.bed | /data/fastqs/sample1_R1.fastq.gz | /data/fastqs/sample1_R2.fastq.gz |
-| sample1_not_trimmed | /data/refs/ref.fasta | | /data/fastqs/sample1_R1.fastq.gz | /data/fastqs/sample1_R2.fastq.gz |
+| sample_trimmed | /data/refs/hsv2_multi.fasta | /data/beds/hsv2_primers.bed | /data/fastqs/sample_R1.fastq.gz | /data/fastqs/sample_R2.fastq.gz |
+| sample_untrimmed | /data/refs/hsv2_multi.fasta | | /data/fastqs/sample_R1.fastq.gz | /data/fastqs/sample_R2.fastq.gz |
+
+## Output layout
+
+All outputs are written under `res_dir` from `config.yaml`.
+
+```
+<res_dir>/
+  references/
+    <reference_hash>/
+      <reference_hash>.masked.fasta or <reference_hash>.unmasked.fasta
+      *.fai *.amb *.ann *.bwt *.pac *.sa
+  <sample>/
+    qc/
+    mapping/
+    consensus/
+    variants/
+    visualization/
+```
+
+Logs are written under `logs/` in the repository root.
 
 ## Configuration
 
-All parameters are set in `config.yaml`:
+The following parameters are currently used:
 
-| Parameter | Default | Description |
-|---|---|---|
-| `sample_sheet` | — | Path to sample sheet CSV |
-| `res_dir` | — | Root output directory |
-| `min_base_quality` | 20 | fastp minimum base quality (Phred) |
-| `min_read_length` | 30 | fastp minimum read length |
-| `fastp_extra` | `""` | Additional fastp arguments |
-| `min_mapping_quality` | 20 | samtools view MAPQ filter |
-| `bwa_mem_extra` | `""` | Additional bwa mem arguments |
-| `min_length_after_trimming` | 50 | ivar trim minimum read length after primer removal |
-| `min_variant_quality` | 30 | ivar minimum base quality for variant calling (Phred) |
-| `min_allele_frequency` | 0.8 | ivar minimum allele frequency for variant calling |
-| `min_allele_frequency_variant` | 0.1 | lofreq filter minimum allele frequency |
-| `min_depth` | 20 | Minimum depth for variant calling and consensus |
-
-## Conda environments
-
-Each rule uses a dedicated conda environment defined under `requirements/`:
-
-| File | Used by |
+| Key | Description |
 |---|---|
-| `requirements_aln.yaml` | bwa, samtools, ivar |
-| `requirements_mask_refs.yaml` | Biopython for `mask_refs.py` |
-| `requirements_fastp.yaml` | fastp |
-| `requirements_lofreq.yaml` | lofreq |
-| `requirements_bcftools.yaml` | bcftools, bgzip |
+| `sample_sheet` | Path to CSV sample sheet |
+| `res_dir` | Root output directory |
+| `min_base_quality` | fastp minimum quality |
+| `min_read_length` | fastp minimum read length |
+| `fastp_extra` | additional fastp flags |
+| `min_mapping_quality` | MAPQ filter for mapped BAM |
+| `min_length_after_trimming` | iVar minimum post-trim read length |
+| `min_variant_quality` | iVar base quality threshold |
+| `min_consensus_frequency` | iVar consensus frequency threshold |
+| `min_depth` | depth threshold used by consensus and variant calling |
+| `min_allele_frequency_variant` | lofreq filter threshold |
+| `bwa_mem_extra` | additional bwa mem flags |
 
-The `transform_ivar_to_vcf` rule uses a Singularity container instead of conda (`biopython_matplotlib_pandas_python_pruned`).
+## Environments and containers
 
-## How to run
+Rule-level environments currently referenced by the Snakefile:
+
+| File | Used for |
+|---|---|
+| `requirements/requirements_aln.yaml` | bwa, samtools, ivar |
+| `requirements/requirements_mask_refs.yaml` | reference masking script |
+| `requirements/requirements_fastp.yaml` | fastp |
+| `requirements/requirements_lofreq.yaml` | lofreq filtering |
+| `requirements/requirements_bcftools.yaml` | bcftools normalization (+ bgzip via bcftools/htslib) |
+| `requirements/requirements_bamdash.yaml` | BAMDash visualization |
+
+The `transform_ivar_to_vcf` step uses the container image defined in the Snakefile.
+
+## Running the workflow
 
 ```bash
 # Dry run
 snakemake -n -p
 
-# Standard run on CVG workstation:
-# Replace <data_dir> with the path to your data directory (must contain fastqs, reference FASTAs, and BED files)
-snakemake --cores 60 --use-conda --verbose --conda-frontend conda  --use-singularity --singularity-args "--bind <data_dir>:<data_dir>"
-
+# Typical run (internal infrastructure)
+# Replace <data_dir> with your mounted data root used by config/sample sheet paths.
+snakemake --cores 60 --use-conda --verbose --conda-frontend conda \
+  --printshellcmds --keep-incomplete --use-singularity \
+  --singularity-args "--bind <data_dir>:<data_dir>"
 ```
 
-> **Note:** The explicit `--singularity-args --bind` is required on the CVG workstation because implicit directory mounting is not available. Set `<data_dir>` to the parent directory containing all your input data (fastqs, reference FASTAs, BED files). This path must match the directory paths used in `config.yaml` and the sample sheet.
+If your Singularity runtime does not support implicit mounts, keep the explicit `--singularity-args --bind` mapping.
 
-## Workflow DAG
+## DAG
 
-The DAG below shows an exemplary run using the sample sheet provided. The same sequencing data is processed twice — once with amplicon primer trimming and once without — by listing the sample under two different names and omitting the `bed` column for the untrimmed case. Both samples are mapped against a multi-FASTA reference containing the HSV-2 genes UL23 and UL30, illustrating the per-reference job expansion and the conditional primer trimming branch.
+Generate and render the DAG:
 
-| sample | reference_fasta | bed | r1 | r2 |
-|---|---|---|---|---|
-| 1545554-HSV2_S82_trimmed | HSV_2_both.fasta | HSV_2_both.bed | 1545554-HSV2_S82_L001_R1_001.fastq.gz | 1545554-HSV2_S82_L001_R2_001.fastq.gz |
-| 1545554-HSV2_S82_not_trimmed | HSV_2_both.fasta | | 1545554-HSV2_S82_L001_R1_001.fastq.gz | 1545554-HSV2_S82_L001_R2_001.fastq.gz |
+```bash
+snakemake --dag | dot -Tsvg > dag.svg
+```
+
+The current `dag.svg` corresponds to an example run where one dataset is represented twice in the sample sheet (trimmed and untrimmed branch) and mapped against two HSV2 reference IDs (UL23 and UL30), demonstrating reference fan-out, conditional primer trimming, and the visualization branch that produces BAMDash HTML reports for each sample/reference pair.
 
 ![Workflow DAG](dag.svg)
