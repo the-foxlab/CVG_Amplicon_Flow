@@ -164,6 +164,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+node_modules/
+galaxy_port_runtime/
 
 # Spyder project settings
 .spyderproject

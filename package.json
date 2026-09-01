@@ -1,0 +1,12 @@
+{
+  "name": "galaxy-port-gui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned frontend dependencies for Galaxy Port GUI MVP",
+  "dependencies": {
+    "@uppy/core": "4.4.1",
+    "@uppy/dashboard": "4.3.0",
+    "@uppy/tus": "4.2.2",
+    "htmx.org": "1.9.12"
+  }
+}

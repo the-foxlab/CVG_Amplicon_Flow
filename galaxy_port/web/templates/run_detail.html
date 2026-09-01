@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+	<h2>Run {{ run_id }}</h2>
+	<p>Status: <strong>{{ state.status }}</strong></p>
+	{% if state.warnings %}
+	<ul>
+		{% for warning in state.warnings %}
+		<li>{{ warning }}</li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+</section>
+
+{% if state.status == "prepared" %}
+<section class="card">
+	<h3>Prepared Run</h3>
+	<p>Run assets generated successfully.</p>
+	<label>Snakemake command</label>
+	<textarea id="snakemake-command" rows="6" readonly>{{ state.snakemake_command }}</textarea>
+	<button type="button" onclick="navigator.clipboard.writeText(document.getElementById('snakemake-command').value)">Copy command</button>
+</section>
+{% else %}
+<section class="card">
+	<h3>1. Upload SampleSheet.csv</h3>
+	<form method="post" action="/runs/{{ run_id }}/samplesheet" enctype="multipart/form-data">
+		<input type="file" name="sample_sheet" accept=".csv" required>
+		<button type="submit">Upload SampleSheet</button>
+	</form>
+	{% if state.sample_ids %}
+	<p>Detected samples: {{ state.sample_ids|join(', ') }}</p>
+	{% endif %}
+</section>
+
+<section class="card">
+	<h3>2. Select FASTQs, Validate Plan, Upload</h3>
+	<div id="uppy-dashboard"></div>
+	<div class="button-row">
+		<button type="button" onclick="galaxyPortRun.validatePlan('{{ run_id }}')">Validate FASTQ Selection</button>
+		<button type="button" id="start-upload-button" onclick="galaxyPortRun.startUpload()" disabled>Start Upload</button>
+	</div>
+	<pre id="plan-output" class="code-block"></pre>
+</section>
+
+<div id="upload-status-panel" hx-get="/runs/{{ run_id }}/upload-status-fragment" hx-trigger="load, every 4s" hx-swap="outerHTML"></div>
+
+<section class="card">
+	<h3>3. Configure Analyses and Prepare Run</h3>
+	<p>Create one or more analyses per uploaded sample. Include trimmed and/or untrimmed variants as needed.</p>
+	<div class="button-row">
+		<button type="button" hx-get="/runs/{{ run_id }}/analysis-row?index=0" hx-target="#analysis-rows" hx-swap="beforeend">Add Analysis</button>
+	</div>
+	<div id="analysis-rows"></div>
+
+	<details>
+		<summary>Run-wide advanced settings</summary>
+		<div id="run-overrides">
+			{% for tool in tool_catalog %}
+			<div class="tool-block" data-tool-id="{{ tool.tool_id }}">
+				<h5>{{ tool.category }}: {{ tool.name }}</h5>
+				{% for option in tool.options %}
+				<div class="option-row" data-option-id="{{ option.option_id }}" data-option-type="{{ option.type }}">
+					<label>
+						<input type="checkbox" class="option-enabled">
+						Override {{ option.label }} (default: {{ option.default }})
+					</label>
+					{% if option.type == "bool" %}
+					<label>Value
+						<input type="checkbox" class="option-value-bool" {% if option.default %}checked{% endif %}>
+					</label>
+					{% elif option.type == "enum" %}
+					<select class="option-value-enum">
+						{% for choice in option.choices %}
+						<option value="{{ choice }}" {% if choice == option.default %}selected{% endif %}>{{ choice }}</option>
+						{% endfor %}
+					</select>
+					{% else %}
+					<input type="text" class="option-value-text" value="{{ option.default }}">
+					{% endif %}
+				</div>
+				{% endfor %}
+			</div>
+			{% endfor %}
+		</div>
+	</details>
+
+	<button type="button" onclick="galaxyPortRun.prepareRun('{{ run_id }}')">Prepare Run</button>
+	<pre id="prepare-output" class="code-block"></pre>
+</section>
+
+<script>
+	window.galaxyPortReferenceOptions = {{ references | tojson }};
+	window.galaxyPortToolCatalog = {{ tool_catalog | tojson }};
+	window.galaxyPortSampleIds = {{ state.sample_ids | default([], true) | tojson }};
+	window.galaxyPortPlan = {{ plan_json | safe }};
+	window.galaxyPortRunId = "{{ run_id }}";
+</script>
+{% endif %}
+{% endblock %}

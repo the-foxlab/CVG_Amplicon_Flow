@@ -1,0 +1,65 @@
+{% set first_reference = references[0] if references else None %}
+<div class="analysis-row" data-analysis-index="{{ index }}">
+	<h4>Analysis {{ index + 1 }}</h4>
+	<label>Analysis ID
+		<input type="text" class="analysis-id" value="{{ sample_ids[0] if sample_ids else 'analysis' }}_{{ index + 1 }}" required>
+	</label>
+	<label>Uploaded Sample
+		<select class="uploaded-sample-id">
+			{% for sample_id in sample_ids %}
+			<option value="{{ sample_id }}">{{ sample_id }}</option>
+			{% endfor %}
+		</select>
+	</label>
+	<label>Reference
+		<select class="reference-id" onchange="galaxyPortRun.updatePrimerOptions(this)">
+			{% for reference in references %}
+			<option value="{{ reference.reference_id }}">{{ reference.name }}</option>
+			{% endfor %}
+		</select>
+	</label>
+	<label>Primer Mode
+		<select class="primer-mode" onchange="galaxyPortRun.togglePrimerMode(this)">
+			<option value="trim">Trim primers</option>
+			<option value="none">Do not trim primers</option>
+		</select>
+	</label>
+	<label class="primer-scheme-wrap">Primer Scheme
+		<select class="primer-scheme-id">
+			{% if first_reference %}
+				{% for primer in first_reference.primer_schemes %}
+				<option value="{{ primer.primer_scheme_id }}">{{ primer.name }}</option>
+				{% endfor %}
+			{% endif %}
+		</select>
+	</label>
+	<details>
+		<summary>Per-analysis advanced settings</summary>
+		{% for tool in tool_catalog %}
+		<div class="tool-block" data-tool-id="{{ tool.tool_id }}">
+			<h5>{{ tool.category }}: {{ tool.name }}</h5>
+			{% for option in tool.options %}
+			<div class="option-row" data-option-id="{{ option.option_id }}" data-option-type="{{ option.type }}">
+				<label>
+					<input type="checkbox" class="option-enabled">
+					Override {{ option.label }} (default: {{ option.default }})
+				</label>
+				{% if option.type == "bool" %}
+				<label>Value
+					<input type="checkbox" class="option-value-bool" {% if option.default %}checked{% endif %}>
+				</label>
+				{% elif option.type == "enum" %}
+				<select class="option-value-enum">
+					{% for choice in option.choices %}
+					<option value="{{ choice }}" {% if choice == option.default %}selected{% endif %}>{{ choice }}</option>
+					{% endfor %}
+				</select>
+				{% else %}
+				<input type="text" class="option-value-text" value="{{ option.default }}">
+				{% endif %}
+			</div>
+			{% endfor %}
+		</div>
+		{% endfor %}
+	</details>
+</div>

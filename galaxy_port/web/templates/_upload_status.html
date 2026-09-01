@@ -1,0 +1,18 @@
+<section class="card">
+	<h3>Upload Completion</h3>
+	<p>Confirmed: {{ confirmed|length }} | Missing: {{ missing|length }}</p>
+	{% if confirmed %}
+	<ul>
+		{% for file_name in confirmed %}
+		<li>uploaded: {{ file_name }}</li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+	{% if missing %}
+	<ul>
+		{% for file_name in missing %}
+		<li>pending: {{ file_name }}</li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+</section>

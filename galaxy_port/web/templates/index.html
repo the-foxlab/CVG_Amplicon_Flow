@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+	<form method="post" action="/runs">
+		<button type="submit">Create Staging Run</button>
+	</form>
+</section>
+<section class="card">
+	<h2>Existing Runs</h2>
+	<ul>
+		{% for run_id in runs %}
+		<li><a href="/runs/{{ run_id }}">{{ run_id }}</a></li>
+		{% else %}
+		<li>No runs yet.</li>
+		{% endfor %}
+	</ul>
+</section>
+{% endblock %}

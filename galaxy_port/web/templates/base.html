@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>{{ title or "Galaxy Port" }}</title>
+	<link rel="stylesheet" href="/static/styles.css">
+	<link rel="stylesheet" href="/vendor/@uppy/core/dist/style.min.css">
+	<link rel="stylesheet" href="/vendor/@uppy/dashboard/dist/style.min.css">
+</head>
+<body>
+	<header class="page-header">
+		<h1>Galaxy Port Run Preparation</h1>
+		<nav><a href="/">Runs</a></nav>
+	</header>
+	<main class="page-content">
+		{% block content %}{% endblock %}
+	</main>
+	<script src="/vendor/htmx.org/dist/htmx.min.js"></script>
+	<script src="/vendor/@uppy/core/dist/uppy.min.js"></script>
+	<script src="/vendor/@uppy/dashboard/dist/uppy-dashboard.min.js"></script>
+	<script src="/vendor/@uppy/tus/dist/uppy-tus.min.js"></script>
+	<script src="/static/run.js"></script>
+</body>
+</html>
