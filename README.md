@@ -1,6 +1,6 @@
 # Snakemake version of the Galaxy workflow
 
-This repository contains a Snakemake port of the Galaxy workflow in `galaxy_workflow_export.ga` for amplicon-aware, reference-based HSV2 analysis, including per-reference BAMDash visualization outputs.
+This repository is under active development and will evenutally provide a Snakemake port of a previously used Galaxy workflow of the Clincal Virus Genomics research group within the Institute of Virology in Freiburg im Breisgau. The main aim of the workflow is to provide a simple workflow for creating consensus genomes and variant vcf files from amplicon based NGS data of viruses. Given a sample sheet providing the paths to the NGS data and reference data used for read mapping, the workflow provides the mapping as bam file, the derived consensus genome as fasta and the variant file in vcf format. Additonally a visualization of the alignment is shown using [BAMdash](https://github.com/jonas-fuchs/BAMdash).
 
 ## Current pipeline behavior
 
@@ -21,15 +21,10 @@ The active workflow performs these steps (from preprocessing through variant ana
 | Convert iVar TSV to VCF | `transform_ivar_to_vcf` | `external_scripts/ivar_variants_to_vcf.py` |
 | Filter variants | `filter_variants_lofreq` | lofreq |
 | Normalize variants | `bcftools_normalize_variants` | bcftools, bgzip |
-| Final deliverable: generate BAM visualization HTML | `visualize_bam_bamdash` | bamdash |
+| Generate BAM visualization HTML | `visualize_bam_bamdash` | bamdash |
 
-The `all` rule currently requires:
 
-1. Per-sample/per-reference consensus FASTA files
-2. Per-sample/per-reference normalized VCF files
-3. Per-sample/per-reference BAMDash HTML reports
-
-## Sample sheet contract
+## Sample sheet 
 
 Required columns:
 
@@ -82,22 +77,8 @@ Logs are written under `logs/` in the repository root.
 
 ## Configuration
 
-The following parameters are currently used:
+The parameters are provided via the `params.yaml/` file. Sensible default values are provided there for each parameter. 
 
-| Key | Description |
-|---|---|
-| `sample_sheet` | Path to CSV sample sheet |
-| `res_dir` | Root output directory |
-| `min_base_quality` | fastp minimum quality |
-| `min_read_length` | fastp minimum read length |
-| `fastp_extra` | additional fastp flags |
-| `min_mapping_quality` | MAPQ filter for mapped BAM |
-| `min_length_after_trimming` | iVar minimum post-trim read length |
-| `min_variant_quality` | iVar base quality threshold |
-| `min_consensus_frequency` | iVar consensus frequency threshold |
-| `min_depth` | depth threshold used by consensus and variant calling |
-| `min_allele_frequency_variant` | lofreq filter threshold |
-| `bwa_mem_extra` | additional bwa mem flags |
 
 ## Environments and containers
 
@@ -123,8 +104,7 @@ snakemake -n -p
 # Typical run (internal infrastructure)
 # Replace <data_dir> with your mounted data root used by config/sample sheet paths.
 snakemake --cores 60 --use-conda --verbose --conda-frontend conda \
-  --printshellcmds --keep-incomplete --use-singularity \
-  --singularity-args "--bind <data_dir>:<data_dir>"
+   --use-singularity --singularity-args "--bind <data_dir>:<data_dir>"
 ```
 
 If your Singularity runtime does not support implicit mounts, keep the explicit `--singularity-args --bind` mapping.
@@ -145,9 +125,9 @@ The current `dag.svg` corresponds to an example run where one dataset is represe
 ## Hashing of references and bed files
 
 A single run can use several reference databases for mapping.
-In practice, many samples reuse the same reference setup, so rebuilding indexes for every sample would be inefficient.
+In practice, many samples usually refere to the same reference for mapping, so rebuilding indexes for every sample would be inefficient.
 
-To avoid this, the workflow creates a content hash:
+To avoid this, the workflow creates a content hash, to only build a database once per reference:
 
 - If no BED file is provided, the hash is computed from the FASTA file only.
 - If a BED file is provided, the hash is computed from FASTA + BED together.
