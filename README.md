@@ -140,3 +140,20 @@ snakemake --dag | dot -Tsvg > dag.svg
 The current `dag.svg` corresponds to an example run where one dataset is represented twice in the sample sheet (trimmed and untrimmed branch) and mapped against two HSV2 reference IDs (UL23 and UL30), demonstrating reference fan-out, conditional primer trimming, and the visualization branch that produces BAMDash HTML reports for each sample/reference pair.
 
 ![Workflow DAG](dag.svg)
+
+
+## Hashing of references and bed files
+
+A single run can use several reference databases for mapping.
+In practice, many samples reuse the same reference setup, so rebuilding indexes for every sample would be inefficient.
+
+To avoid this, the workflow creates a content hash:
+
+- If no BED file is provided, the hash is computed from the FASTA file only.
+- If a BED file is provided, the hash is computed from FASTA + BED together.
+
+Including the BED file is important because primer trimming changes the effective reference used for mapping.
+So the same FASTA with a different BED must produce a different hash and a different cached database.
+
+During sample-sheet loading, the workflow builds a dictionary that maps each sample's `(reference_fasta, bed)` combination to its hash.
+That hash is then used as the key for reusing or creating the corresponding reference database artifacts.

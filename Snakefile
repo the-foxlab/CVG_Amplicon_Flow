@@ -1,151 +1,11 @@
 configfile: "config.yaml"
 
 from pathlib import Path
-import hashlib
+import sys
 
-import pandas as pd
-from Bio import SeqIO
+sys.path.insert(0, str(Path(workflow.basedir) / "scripts"))
 
-
-def hashfile(file_names):
-
-    # A arbitrary (but fixed) buffer size
-    # 65536 = 65536 bytes = 64 kilobytes
-    BUF_SIZE = 65536
-
-    # Initializing the sha256() method
-    sha256 = hashlib.sha256()
-
-    # Opening the file provided as the first 
-    # commandline argument
-    for file in file_names:
-        with open(file, 'rb') as f:
-            while True:
-                # reading data = BUF_SIZE from the 
-                # file and saving it in a variable
-                data = f.read(BUF_SIZE)
-
-                # True if eof = 1
-                if not data:
-                    break
-
-                # Passing that data to that sh256 hash 
-                # function (updating the function with that data)
-                sha256.update(data)
-
-    # sha256.hexdigest() hashes all the input data passed
-    # to the sha256() via sha256.update()
-    # Acts as a finalize method, after which 
-    # all the input data gets hashed
-    # hexdigest() hashes the data, and returns 
-    # the output in hexadecimal format
-    return sha256.hexdigest()
-  
-
-def _is_missing(value):
-    text = str(value).strip()
-    return not text or text.lower() == "nan"
-
-
-def _read_fasta_names(fasta_path):
-    names = []
-    seen = set()
-    with open(fasta_path) as handle:
-        for record in SeqIO.parse(handle, "fasta"):
-            name = record.id
-            if name in seen:
-                raise ValueError(f"Duplicate FASTA record name '{name}' in {fasta_path}")
-            seen.add(name)
-            names.append(name)
-    if not names:
-        raise ValueError(f"No FASTA records found in {fasta_path}")
-    return names
-
-
-def _read_bed_names(bed_path):
-    names = []
-    seen = set()
-    with open(bed_path) as handle:
-        for line in handle:
-            if not line.strip() or line.startswith("#") or line.startswith("track") or line.startswith("browser"):
-                continue
-            parts = line.rstrip("\n").split("\t")
-            if len(parts) < 3:
-                continue
-            name = parts[0].strip()
-            if not name:
-                continue
-            if name not in seen:
-                seen.add(name)
-                names.append(name)
-    return names
-
-
-def _load_samples_from_sheet(sample_sheet):
-    samples = {}
-    table = pd.read_csv(sample_sheet, sep=',', engine="python")
-
-    required_columns = {"sample", "reference_fasta", "r1", "r2"}
-    if not required_columns.issubset(set(table.columns)):
-        raise ValueError(
-            "sample_sheet must contain columns: sample, reference_fasta, r1, r2"
-        )
-
-    has_bed_column = "bed" in set(table.columns)
-
-    for row in table.itertuples(index=False):
-        sample = str(row.sample).strip()
-        if _is_missing(sample):
-            continue
-
-        reference_fasta = str(row.reference_fasta).strip()
-        r1 = str(row.r1).strip()
-        r2 = str(row.r2).strip()
-        bed = str(row.bed).strip() if has_bed_column else ""
-
-        if _is_missing(reference_fasta) or _is_missing(r1) or _is_missing(r2):
-            raise ValueError(
-                f"Sample '{sample}' has missing reference_fasta, r1 or r2 in sample_sheet"
-            )
-
-        if sample in samples:
-            raise ValueError(f"Duplicate sample in sample_sheet: '{sample}'")
-
-        reference_names = _read_fasta_names(reference_fasta)
-        bed_names = []
-        if not _is_missing(bed):
-            bed_names = _read_bed_names(bed)
-            unknown_bed_names = sorted(set(bed_names) - set(reference_names))
-            if unknown_bed_names:
-                raise ValueError(
-                    f"BED file for sample '{sample}' contains references not present in FASTA: {unknown_bed_names}"
-                )
-
-        effective_references = bed_names if bed_names else reference_names
-        if not effective_references:
-            raise ValueError(
-                f"Sample '{sample}' has no usable references after FASTA/BED parsing"
-            )
-
-        samples[sample] = {
-            "reference_fasta": reference_fasta,
-            "bed": "" if _is_missing(bed) else bed,
-            "r1": r1,
-            "r2": r2,
-            "references": effective_references,
-            "reference_hash": hashfile([reference_fasta]) if _is_missing(bed) else hashfile([reference_fasta, bed]),
-        }
-
-    if not samples:
-        raise ValueError("sample_sheet was provided but no samples were parsed")
-    return samples
-
-
-def _load_samples(cfg):
-    sample_sheet = cfg.get("sample_sheet")
-    if not sample_sheet:
-        raise ValueError("sample_sheet is required")
-    return _load_samples_from_sheet(sample_sheet)
+from snakefile_helpers import append_res_dir, build_bwa_files, load_samples, masked_reference_fasta
 
 
 def _reference_fasta(wildcards):
@@ -153,44 +13,28 @@ def _reference_fasta(wildcards):
 
 
 def _all_bwa_files(wildcards):
-    sample = SAMPLES_MAP[wildcards.sample]
-    hash_value = sample["reference_hash"]
-
-    ref_type = "masked" if sample["bed"] else "unmasked"
-
-    ref = _append_res_dir(
-        f"references/{hash_value}/{hash_value}.{ref_type}.fasta"
-    )
-
-    return {
-        "ref": ref,
-        "ref_fai": f"{ref}.fai",
-        "ref_amb": f"{ref}.amb",
-        "ref_ann": f"{ref}.ann",
-        "ref_bwt": f"{ref}.bwt",
-        "ref_pac": f"{ref}.pac",
-        "ref_sa": f"{ref}.sa",
-    }
+    return build_bwa_files(SAMPLES_MAP[wildcards.sample], RES_DIR)
 
     
 def _bed_file(wildcards):
     return SAMPLES_MAP[wildcards.sample].get("bed") or ""
+
+
 def _append_res_dir(p):
-    return str(Path(RES_DIR) / p)
+    return append_res_dir(RES_DIR, p)
+
 
 def _masked_reference_fasta(wildcards):
-    sample = SAMPLES_MAP[wildcards.sample]
-    hash_value = sample["reference_hash"]
-    ref_type = "masked" if sample["bed"] else "unmasked"
-    return _append_res_dir(f"references/{hash_value}/{hash_value}.{ref_type}.fasta")
+    return masked_reference_fasta(SAMPLES_MAP[wildcards.sample], RES_DIR)
 
 
 RES_DIR = config.get('res_dir')
-SAMPLES_MAP = _load_samples(config)
+SAMPLES_MAP = load_samples(config)
 SAMPLES = sorted(SAMPLES_MAP.keys())
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
-HASH_to_files = {SAMPLES_MAP[sample]["reference_hash"]: [SAMPLES_MAP[sample].get("reference_fasta"), 
-                                                        SAMPLES_MAP[sample].get("bed")] for sample in SAMPLES}
+
+# Check the README section "Hashing of references and bed files" for an explanation of this mechanism
+HASH_to_files = {SAMPLES_MAP[sample]["reference_hash"]: [SAMPLES_MAP[sample].get("reference_fasta"), SAMPLES_MAP[sample].get("bed")] for sample in SAMPLES}
 
 wildcard_constraints:
     ref_type="masked|unmasked"
@@ -200,7 +44,8 @@ rule all:
     input:
         [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
         [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
-        [_append_res_dir(f"{sample}/visualization/{sample}_{reference}/{sample}_{reference}.html") for sample, reference in RUN_KEYS]
+        [_append_res_dir(f"{sample}/visualization/{sample}_{reference}_plot.html") for sample, reference in RUN_KEYS]
+
 
 def _get_masking_input(wildcards):
     [fasta_fn, bed_fn] = HASH_to_files[wildcards.hash_value]
@@ -282,8 +127,8 @@ rule qc_trim:
         stdout="logs/{sample}/qc_trim.stdout.log",
         stderr="logs/{sample}/qc_trim.stderr.log"
     params:
-        min_quality=config.get("min_base_quality", 20),
-        min_length=config.get("min_read_length", 30),
+        min_quality=config.get("fastp_min_base_quality", 20),
+        min_length=config.get("fastp_min_read_length", 30),
         extra=config.get("fastp_extra", "")
     threads:
         4
@@ -299,6 +144,11 @@ rule qc_trim:
         """
 
 rule map_reads:
+    """
+    Map reads to reference using BWA MEM, sort and filter the resulting BAM file.
+    The filtering of samtools view is different to the galaxy pipeline. 
+    This was adapted after discussions with Jonas Fuchs about the intended behavior. 
+    """
     input:
         unpack(_all_bwa_files),
         r1=_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"),
@@ -312,6 +162,10 @@ rule map_reads:
         stderr="logs/{sample}/map_reads.stderr.log"
     params:
         extra=config.get("bwa_mem_extra", ""),
+        T=config.get("bwa_T", 30),
+        h=config.get("bwa_h", 5),
+        sam_f=config.get("samtools_filtering_post_mapping_f", "3"),
+        sam_F=config.get("samtools_filtering_post_mapping_F", "4"),
         min_mapping_quality=config.get("min_mapping_quality", 30)
     threads:
         16
@@ -319,9 +173,9 @@ rule map_reads:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        bwa mem -t {threads} -T 30 -h 5 {params.extra} {input.ref} {input.r1} {input.r2} 2> {log.stderr} \
+        bwa mem -t {threads} -T {params.T} -h {params.h} {params.extra} {input.ref} {input.r1} {input.r2} 2> {log.stderr} \
             | samtools sort -o {output.sorted_bam} - > {log.stdout} 2>> {log.stderr}; 
-        samtools view -b -f 3 -F 4 -q {params.min_mapping_quality} -o {output.filtered_bam} {output.sorted_bam} >> {log.stdout} 2>> {log.stderr};
+        samtools view -b -f {params.sam_f} -F {params.sam_F} -q {params.min_mapping_quality} -o {output.filtered_bam} {output.sorted_bam} >> {log.stdout} 2>> {log.stderr};
         samtools index {output.filtered_bam} >> {log.stdout} 2>> {log.stderr};
         """
 
@@ -364,14 +218,17 @@ rule trim_bam:
     params:
         bed_fn = lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
         prefix = lambda wildcards: _append_res_dir(f"{wildcards.sample}/mapping/{wildcards.sample}_{wildcards.reference}.temp.bam"),
-        min_len_after_trimming = config['min_length_after_trimming']
+        min_len_after_trimming = config['ivar_min_length_after_trimming'],
+        trim_offset = config['ivar_trim_offset'],
+        trim_q = config['ivar_trim_q'],
+        trim_s = config['ivar_trim_s']
     conda:
         'requirements/requirements_aln.yaml'
     shell:
         """        
         echo "$(date '+%Y-%m-%d %H:%M:%S') Starting ivar trim" >> {log.stdout};
         ivar trim -i {input.split_bam} -b {params.bed_fn} -p {params.prefix} \
-        -x 0 -e -m {params.min_len_after_trimming} -q 20 -s 4  >> {log.stdout} 2>> {log.stderr};
+        -x {params.trim_offset} -e -m {params.min_len_after_trimming} -q {params.trim_q} -s {params.trim_s}  >> {log.stdout} 2>> {log.stderr};
         echo "$(date '+%Y-%m-%d %H:%M:%S') Done with ivar trim" >> {log.stdout};
         samtools sort -o {output.bam_trimmed} {output.temp_bam} >> {log.stdout} 2>> {log.stderr};
         samtools index {output.bam_trimmed} >> {log.stdout} 2>> {log.stderr};
@@ -392,10 +249,15 @@ rule create_consensus:
     output:
         _append_res_dir("{sample}/consensus/{sample}_{reference}_consensus.fa")
     params:
-        min_quality=config.get("min_variant_quality", 20),
-        min_freq=config.get("min_consensus_frequency", 0.8),
-        min_depth=config.get("min_depth", 20),
-        prefix = lambda wildcards: _append_res_dir(f"{wildcards.sample}/consensus/{wildcards.sample}_{wildcards.reference}_consensus")
+        min_quality=config.get("cons_ivar_min_variant_quality", 30),
+        min_freq=config.get("cons_ivar_min_consensus_frequency", 0.75),
+        min_insertion_freq=config.get("cons_ivar_min_insertion_frequency", 0.75),
+        min_depth=config.get("cons_ivar_min_depth", 20),
+        prefix = lambda wildcards: _append_res_dir(f"{wildcards.sample}/consensus/{wildcards.sample}_{wildcards.reference}_consensus"),
+        mpileup_A = "-A" if config.get("cons_mpileup_A", True) else "",
+        mpileup_a = "-a" if config.get("cons_mpileup_a", True) else "",
+        mpileup_d = config.get("cons_mpileup_extra", 0),
+        mpileup_Q = config.get("cons_mpileup_Q", 0)
     log:
         stdout="logs/{sample}/create_consensus_{reference}.stdout.log",
         stderr="logs/{sample}/create_consensus_{reference}.stderr.log"
@@ -403,11 +265,11 @@ rule create_consensus:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        samtools mpileup -A -a -d 0 -Q 0 {input.bam} 2> {log.stderr} | \
-        ivar consensus -p {params.prefix} -q {params.min_quality} -t {params.min_freq} -c 0.75 -m {params.min_depth} -n N \
-        > {log.stdout} 2>> {log.stderr};
+        samtools mpileup {params.mpileup_A} {params.mpileup_a} -d {params.mpileup_d} -Q {params.mpileup_Q} \
+         {input.bam} 2> {log.stderr} | \
+        ivar consensus -p {params.prefix} -q {params.min_quality} -t {params.min_freq} -c {params.min_insertion_freq} \
+         -m {params.min_depth} -n N > {log.stdout} 2>> {log.stderr};
         """
-
 
 rule call_variants_ivar:
     input:
@@ -417,10 +279,14 @@ rule call_variants_ivar:
         temp_fasta=_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta"),
         tsv=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv")
     params:
-        min_quality=config.get("min_variant_quality", 20),
-        min_freq=config.get("min_allele_frequency", 0.8),
-        min_depth=config.get("min_depth", 20),
+        mpileup_A = "-A" if config.get("ivar_variant_mpileup_A", True) else "",
+        mpileup_d = config.get("ivar_variant_mpileup_d", 0),
+        mpileup_B = "-B" if config.get("ivar_variant_mpileup_B", True) else "",
+        mpileup_Q = config.get("ivar_variant_mpileup_Q", 0),
         ivar_prefix=lambda wildcards: _append_res_dir(f"{wildcards.sample}/variants/{wildcards.sample}_{wildcards.reference}.ivar"),
+
+        ivar_q=config.get("ivar_variant_min_variant_quality", 30),
+        ivar_t=config.get("ivar_variant_t", 0.0),
         ref_name= lambda wildcards: wildcards.reference
     log:
         stdout="logs/{sample}/call_variants_ivar_{reference}.stdout.log",
@@ -430,10 +296,13 @@ rule call_variants_ivar:
     shell:
         """
         samtools faidx {input.ref} {params.ref_name} > {output.temp_fasta} 2> {log.stderr};
-        samtools mpileup -A -d 0 -B -Q 0 --reference {output.temp_fasta} {input.bam} 2>> {log.stderr} | \
-            ivar variants -p {params.ivar_prefix} -q {params.min_quality} -t {params.min_freq} -m {params.min_depth} -r {input.ref} \
+        samtools mpileup {params.mpileup_A} -d {params.mpileup_d} {params.mpileup_B} -Q {params.mpileup_Q} \
+        --reference {output.temp_fasta} {input.bam} 2>> {log.stderr} | \
+        ivar variants -p {params.ivar_prefix} -q {params.ivar_q} -t {params.ivar_t} -r {input.ref} \
             > {log.stdout} 2>> {log.stderr};                
         """
+
+
 
 rule transform_ivar_to_vcf:
     input:
@@ -463,8 +332,11 @@ rule filter_variants_lofreq:
     output:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf")
     params:
-        min_cov=config.get("min_coverage", 10),
-        min_freq=config.get("min_allele_frequency_variant", 0.1)
+        lofreq_no_defaults = "--no-defaults " if config.get("lofreq_filter_no_defaults", True) else "",
+        lofreq_v = config.get("lofreq_filter_v", 20),
+        lofreq_V = config.get("lofreq_filter_V", 0),
+        lofreq_a = config.get("lofreq_filter_a", 0.1),
+        lofreq_A = config.get("lofreq_filter_A", 0.0)
     conda:
         "requirements/requirements_lofreq.yaml"
     log:
@@ -472,7 +344,8 @@ rule filter_variants_lofreq:
         stderr="logs/{sample}/filter_variants_lofreq_{reference}.stderr.log"
     shell:
         """
-        lofreq filter -i {input.vcf} --no-defaults --verbose -v {params.min_cov} -V 0 -a 0.1 -A 0.0 -o {output.vcf} > {log.stdout} 2> {log.stderr};
+        lofreq filter -i {input.vcf} {params.lofreq_no_defaults} --verbose -v {params.lofreq_v} -V {params.lofreq_V} \
+            -a {params.lofreq_a} -A {params.lofreq_A} -o {output.vcf} > {log.stdout} 2> {log.stderr};
         """
 
 rule bcftools_normalize_variants:
@@ -482,7 +355,10 @@ rule bcftools_normalize_variants:
     output:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf")
     params:
-        args="--check-ref w --site-win 1000 --sort pos --output-type 'v'"
+        check_ref=config.get("bcftools_normalize_check_ref", "w"),
+        site_win=config.get("bcftools_normalize_site_win", 1000),
+        sort=config.get("bcftools_normalize_sort", "pos"),
+        out_type=config.get("bcftools_normalize_out_type", "v")
     conda:
         "requirements/requirements_bcftools.yaml"
     threads:
@@ -494,7 +370,8 @@ rule bcftools_normalize_variants:
         """
         bgzip -c {input.vcf} > {input.vcf}.gz 2> {log.stderr};
         bcftools index {input.vcf}.gz > {log.stdout} 2>> {log.stderr};
-        bcftools norm --fasta-ref {input.ref} {params.args} \
+        bcftools norm --fasta-ref {input.ref} --check-ref {params.check_ref} --site-win {params.site_win} \
+        --sort {params.sort} --output-type {params.out_type} \
         --threads {threads} {input.vcf}.gz > {output.vcf} 2>> {log.stderr};
         """
 
@@ -503,19 +380,17 @@ rule visualize_bam_bamdash:
         bam=get_bam_input,
         bai=lambda wildcards: f"{get_bam_input(wildcards)}.bai",
     output:
-        html=_append_res_dir("{sample}/visualization/{sample}_{reference}/{sample}_{reference}.html")
+        html=_append_res_dir("{sample}/visualization/{sample}_{reference}_plot.html"),
     log:
         stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash_{reference}.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash_{reference}.stderr.log")
     params:
         ref_id = lambda wildcards: wildcards.reference,
-        out_dir = _append_res_dir("{sample}/visualization/{sample}_{reference}")
+        prefix = _append_res_dir("{sample}/visualization/{sample}_{reference}_plot"),
+        bs = config.get("bamdash_bs", 10)
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        mkdir -p {params.out_dir} > {log.stdout} 2> {log.stderr};
-        cd {params.out_dir} >> {log.stdout} 2>> {log.stderr};
-        bamdash --bam {input.bam} -r {params.ref_id} -bs 10  >> {log.stdout} 2>> {log.stderr};
-        mv {params.ref_id}_plot.html {output.html} >> {log.stdout} 2>> {log.stderr}
+        bamdash --bam {input.bam} -r {params.ref_id} -bs {params.bs} -p {params.prefix} >> {log.stdout} 2>> {log.stderr};
         """

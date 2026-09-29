@@ -6,30 +6,39 @@ sample_sheet: sample_sheet.csv
 res_dir: /mnt/common/researchers/udo_gieraths/galaxy_port_data/results
 
 # fastp parameters
-min_base_quality: 20
-min_read_length: 30
+fastp_min_base_quality: 20
+fastp_min_read_length: 30
 fastp_extra: ""
 
 
-# samtools view filtering
-min_mapping_quality: 20 # MAPQ score
+# BWA MEM parameters
+bwa_T: 30 # minimum score to output an alignment
+bwa_h: 5 # if there are <INT hits with score >80.00% of the max score, output all in XA [5,200]
+bwa_mem_extra: ""
 
-# variant calling parameters
-min_allele_frequency_variant: 0.1
-
+# samtools filtering after mapping
+samtools_filtering_post_mapping_f : "3" # require both reads to be properly paired
+samtools_filtering_post_mapping_F : "4" # exclude unmapped reads
+samtools_filtering_post_mapping_q: 15 # MAPQ score
 
 # ivar trimming parameters
-min_length_after_trimming: 50
+ivar_min_length_after_trimming: 50
+ivar_trim_offset: 0
+ivar_trim_q: 20 # Minimum quality threshold for sliding window to pass
+ivar_trim_s: 4 # Sliding window size for trimming, in bases 
 
 
 # ivar consensus parameters
-min_variant_quality: 30 # Phred score
-min_consensus_frequency: 0.75
-min_depth: 20
+cons_mpileup_A: True # include anomalous read pairs in mpileup
+cons_mpileup_a: True # output all positions in mpileup, even those with zero coverage
+cons_mpileup_d: 0 # max per-file depth for mpileup 
+cons_mpileup_Q: 0 # minimum base quality for mpileup
+cons_ivar_min_variant_quality: 30 # Phred score
+cons_ivar_min_consensus_frequency: 0.75
+cons_ivar_min_depth: 20
 
-# BWA MEM parameters
-bwa_mem_extra: ""
 
-run_denovo: true
-run_metagenomics: false
-build_snpeff_db: false
+
+
+# variant calling parameters
+min_allele_frequency_variant: 0.1
