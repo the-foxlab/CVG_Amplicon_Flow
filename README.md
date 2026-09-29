@@ -1,6 +1,19 @@
 # CVG Amplicon Flow 
 
-This repository is under active development and will evenutally provide a Snakemake port of a previously used Galaxy workflow of the Clincal Virus Genomics research group within the Institute of Virology in Freiburg im Breisgau. The main aim of the workflow is to provide a simple workflow for creating consensus genomes and variant vcf files from amplicon based NGS data of viruses. Given a sample sheet providing the paths to the NGS data and reference data used for read mapping, the workflow provides the mapping as bam file, the derived consensus genome as fasta and the variant file in vcf format. Additonally a visualization of the alignment is shown using [BAMdash](https://github.com/jonas-fuchs/BAMdash).
+> **Note:**  This repository is under active developemnt.
+
+This project provides a [Snakemake](https://snakemake.readthedocs.io/) port of a Galaxy workflow previously developed and used by the **Clinical Virus Genomics** research group at the **Institute of Virology, Freiburg**.
+
+The primary goal is to offer a simple, automated pipeline for generating **consensus genomes** and **variant call files (VCF)** from amplicon-based viral NGS data.
+
+### Key Inputs & Outputs
+
+* **Inputs:** A sample sheet containing paths to raw NGS sequencing data and reference files for read mapping.
+* **Outputs:**
+  * Read alignments (`.bam`)
+  * Consensus genomes (`.fasta`)
+  * Called variants (`.vcf`)
+  * Interactive alignment visualizations via [BAMdash](https://github.com/jonas-fuchs/BAMdash).
 
 ## Current pipeline behavior
 
