@@ -37,8 +37,26 @@ cons_ivar_min_variant_quality: 30 # Phred score
 cons_ivar_min_consensus_frequency: 0.75
 cons_ivar_min_depth: 20
 
+# ivar variant calling parameters
+ivar_variant_mpileup_A: True # include anomalous read pairs in mpileup
+ivar_variant_mpileup_d: 0 # max per-file depth for mpileup 
+ivar_variant_mpileup_B: True #  disable BAQ (per-Base Alignment Quality)
+ivar_variant_mpileup_Q: 0 # minimum base quality for mpileup
+ivar_variant_min_variant_quality: 30 # Phred score
+ivar_variant_t: 0.0 # minimum allele frequency threshold for variant callin
 
+# lofreq filter parameters
+lofreq_filter_no_defaults : True
+lofreq_filter_v: 20
+lofreq_filter_V: 0
+lofreq_filter_a: 0.1
+lofreq_filter_A : 0.0
 
+# bcftools normalize parameters
+bcftools_normalize_check_ref: "w"
+bcftools_normalize_site_win: 1000
+bcftools_normalize_sort: "pos"
+bcftools_normalize_out_type: "v"
 
-# variant calling parameters
-min_allele_frequency_variant: 0.1
+# bamdash parameters
+bamdash_bs: 10
