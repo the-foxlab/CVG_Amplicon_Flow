@@ -44,7 +44,7 @@ rule all:
     input:
         [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
         [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
-        [_append_res_dir(f"{sample}/visualization/{sample}_{reference}_plot.html") for sample, reference in RUN_KEYS]
+        [_append_res_dir(f"{sample}/visualization/{sample}_plot.html") for sample in SAMPLES]
 
 
 def _get_masking_input(wildcards):
@@ -325,7 +325,6 @@ rule transform_ivar_to_vcf:
         {params.options} > {log.stdout} 2> {log.stderr};
         """
 
-
 rule filter_variants_lofreq:
     input:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.vcf")
@@ -375,22 +374,38 @@ rule bcftools_normalize_variants:
         --threads {threads} {input.vcf}.gz > {output.vcf} 2>> {log.stderr};
         """
 
+
+def get_all_bams_per_sample(wildcards):
+    bam_files = []
+    is_trimmed = True if SAMPLES_MAP[wildcards.sample]["bed"] else False
+    
+    for reference in SAMPLES_MAP[wildcards.sample]["references"]:
+        if is_trimmed:
+            bam_files.append(_append_res_dir(f"{wildcards.sample}/mapping/{wildcards.sample}_{reference}.sorted.filtered.trimmed.bam"))
+        else:
+            bam_files.append(_append_res_dir(f"{wildcards.sample}/mapping/{wildcards.sample}_{reference}.sorted.filtered.bam"))
+    return bam_files
+
 rule visualize_bam_bamdash:
     input:
-        bam=get_bam_input,
-        bai=lambda wildcards: f"{get_bam_input(wildcards)}.bai",
+        bam=get_all_bams_per_sample,
+        bai=lambda wildcards: [f"{bam}.bai" for bam in get_all_bams_per_sample(wildcards)]
     output:
-        html=_append_res_dir("{sample}/visualization/{sample}_{reference}_plot.html"),
+        temp_bam = temp(_append_res_dir("{sample}/visualization/{sample}_merged.bam")),
+        temp_bai = temp(_append_res_dir("{sample}/visualization/{sample}_merged.bam.bai")),
+        html=_append_res_dir("{sample}/visualization/{sample}_plot.html"),
     log:
-        stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash_{reference}.stdout.log"),
-        stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash_{reference}.stderr.log")
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stderr.log")
     params:
-        ref_id = lambda wildcards: wildcards.reference,
-        prefix = _append_res_dir("{sample}/visualization/{sample}_{reference}_plot"),
-        bs = config.get("bamdash_bs", 10)
+        prefix = _append_res_dir("{sample}/visualization/{sample}_plot"),
+        bs = config.get("bamdash_bs", 10),
+        add_track = lambda wildcards: f"-t {SAMPLES_MAP[wildcards.sample]['bed']}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam} -r {params.ref_id} -bs {params.bs} -p {params.prefix} >> {log.stdout} 2>> {log.stderr};
+        samtools merge -o {output.temp_bam} {input.bam} > {log.stdout} 2> {log.stderr};
+        samtools index {output.temp_bam} >> {log.stdout} 2>> {log.stderr};
+        bamdash --bam {output.temp_bam} -bs {params.bs} -p {params.prefix} {params.add_track} >> {log.stdout} 2>> {log.stderr};
         """

@@ -4,3 +4,4 @@ channels:
   - nodefaults
 dependencies:
   - bamdash=0.5.0
+  - samtools=1.22
