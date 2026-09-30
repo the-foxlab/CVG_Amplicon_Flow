@@ -1,0 +1,3 @@
+sample,reference_fasta,bed,r1,r2
+sample_1_trimmed, reference.fasta, primers.bed, sample_1_R1.fastq.gz, sample_1_R2.fastq.gz
+sample_1_not_trimmed, reference.fasta,,sample_1_R1.fastq.gz, sample_1_R2.fastq.gz
