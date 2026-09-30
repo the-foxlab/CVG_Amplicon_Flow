@@ -6,6 +6,8 @@ results/
 logs/
 galaxy_workflow_export.ga
 *.sif
+sample_sheet.csv
+my_config.yaml
 
 __pycache__/
 *.py[codz]
