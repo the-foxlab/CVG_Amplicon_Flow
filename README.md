@@ -93,34 +93,15 @@ Logs are written under `logs/` in the repository root.
 The parameters are provided via the `params.yaml/` file. Sensible default values are provided there for each parameter. 
 
 
-## Environments and containers
-
-Rule-level environments currently referenced by the Snakefile:
-
-| File | Used for |
-|---|---|
-| `requirements/requirements_aln.yaml` | bwa, samtools, ivar |
-| `requirements/requirements_mask_refs.yaml` | reference masking script |
-| `requirements/requirements_fastp.yaml` | fastp |
-| `requirements/requirements_lofreq.yaml` | lofreq filtering |
-| `requirements/requirements_bcftools.yaml` | bcftools normalization (+ bgzip via bcftools/htslib) |
-| `requirements/requirements_bamdash.yaml` | BAMDash visualization |
-
-The `transform_ivar_to_vcf` step uses the container image defined in the Snakefile.
-
 ## Running the workflow
 
 ```bash
 # Dry run
 snakemake -n -p
 
-# Typical run (internal infrastructure)
-# Replace <data_dir> with your mounted data root used by config/sample sheet paths.
-snakemake --cores 60 --use-conda --verbose --conda-frontend conda \
-   --use-singularity --singularity-args "--bind <data_dir>:<data_dir>"
+# Typical run (on internal infa)
+snakemake --cores 60 --use-conda --verbose --conda-frontend conda 
 ```
-
-If your Singularity runtime does not support implicit mounts, keep the explicit `--singularity-args --bind` mapping.
 
 ## DAG
 
@@ -130,7 +111,7 @@ Generate and render the DAG:
 snakemake --dag | dot -Tsvg > dag.svg
 ```
 
-The current `dag.svg` corresponds to an example run where one dataset is represented twice in the sample sheet (trimmed and untrimmed branch) and mapped against two HSV2 reference IDs (UL23 and UL30), demonstrating reference fan-out, conditional primer trimming, and the visualization branch that produces BAMDash HTML reports for each sample/reference pair.
+The current `dag.svg` corresponds to an example run where one dataset is represented twice in the sample sheet (trimmed and untrimmed branch) and mapped against two HSV2 reference IDs (UL23 and UL30), demonstrating reference fan-out, conditional primer trimming, and the visualization branch that produces BAMDash HTML reports.
 
 ![Workflow DAG](dag.svg)
 

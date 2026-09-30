@@ -315,6 +315,8 @@ rule transform_ivar_to_vcf:
         stderr="logs/{sample}/transform_ivar_to_vcf_{reference}.stderr.log"
     container:
         'docker://community.wave.seqera.io/library/biopython_matplotlib_pandas_python_pruned:46d87e2ad1f8a063'
+    conda:
+        'requirements/requirements_var_to_vcf.yaml'
     params:
         ref_name= lambda wildcards: wildcards.reference,
         # --ignore_strand_bias for amplicon runs, for now i always ignore it
