@@ -320,7 +320,7 @@ rule transform_ivar_to_vcf:
         'requirements/requirements_var_to_vcf.yaml'
     params:
         ref_name= lambda wildcards: wildcards.reference,
-        script=str(Path(workflow.basedir) / "external_scripts/ivar_variants_to_vcf.py")
+        script=str(Path(workflow.basedir) / "external_scripts/ivar_variants_to_vcf.py"), 
         # --ignore_strand_bias for amplicon runs, for now i always ignore it
         options = "--ignore_strand_bias"
     shell:
