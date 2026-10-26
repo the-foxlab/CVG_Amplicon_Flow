@@ -95,7 +95,15 @@ The parameters are provided via the `params.yaml/` file. Sensible default values
 
 ## Running the workflow
 
+Make sure that you have snakemake and other dependencies specified in `requirements/requirements_base_env.yaml` installed before running the pipeline.
+
 ```bash
+# Create snakemake environment
+conda env create --name cvg_amp_flow_base --file requirements/requirements_base_env.yaml
+
+# Activate environment 
+conda activate cvg_amp_flow_base
+
 # Dry run
 snakemake -n -p
 

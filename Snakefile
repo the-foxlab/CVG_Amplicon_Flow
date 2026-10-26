@@ -29,6 +29,7 @@ def _masked_reference_fasta(wildcards):
 
 
 RES_DIR = config.get('res_dir')
+print('cwd: ', Path.cwd())
 SAMPLES_MAP = load_samples(config)
 SAMPLES = sorted(SAMPLES_MAP.keys())
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
