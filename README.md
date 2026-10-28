@@ -109,6 +109,9 @@ snakemake -n -p
 
 # Typical run (on internal infa)
 snakemake --cores 60 --use-conda --verbose --conda-frontend conda 
+
+# Keeping all temporary files. Useful for debugging 
+snakemake --cores 60 --use-conda --verbose --conda-frontend conda --notemp
 ```
 
 ## DAG

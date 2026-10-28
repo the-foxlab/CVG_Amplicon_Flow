@@ -30,7 +30,7 @@ def _masked_reference_fasta(wildcards):
 
 RES_DIR = config.get('res_dir')
 SAMPLES_MAP = load_samples(config)
-SAMPLES = sorted(SAMPLES_MAP.keys())[:1]
+SAMPLES = sorted(SAMPLES_MAP.keys())
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
 # Check the README section "Hashing of references and bed files" for an explanation of this mechanism
 HASH_to_files = {SAMPLES_MAP[sample]["reference_hash"]: [SAMPLES_MAP[sample].get("reference_fasta"), SAMPLES_MAP[sample].get("bed")] for sample in SAMPLES}
