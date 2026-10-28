@@ -31,11 +31,11 @@ def _masked_reference_fasta(wildcards):
 RES_DIR = config.get('res_dir')
 print('cwd: ', Path.cwd())
 SAMPLES_MAP = load_samples(config)
-SAMPLES = sorted(SAMPLES_MAP.keys())
+SAMPLES = sorted(SAMPLES_MAP.keys())[:1]
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
-
 # Check the README section "Hashing of references and bed files" for an explanation of this mechanism
 HASH_to_files = {SAMPLES_MAP[sample]["reference_hash"]: [SAMPLES_MAP[sample].get("reference_fasta"), SAMPLES_MAP[sample].get("bed")] for sample in SAMPLES}
+
 
 wildcard_constraints:
     ref_type="masked|unmasked"
@@ -43,9 +43,9 @@ wildcard_constraints:
 
 rule all:
     input:
-        [_append_res_dir(f"{sample}/consensus/{sample}_{reference}_consensus.fa") for sample, reference in RUN_KEYS],
-        [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
-        [_append_res_dir(f"{sample}/visualization/{sample}_plot.html") for sample in SAMPLES]
+        [_append_res_dir(f"{sample.strip()}/consensus/{sample}_{reference.strip()}_consensus.fa") for sample, reference in RUN_KEYS],
+        # [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
+        # [_append_res_dir(f"{sample}/visualization/{sample}_plot.html") for sample in SAMPLES]
 
 
 def _get_masking_input(wildcards):
@@ -120,10 +120,10 @@ rule qc_trim:
         r1=lambda wildcards: SAMPLES_MAP[wildcards.sample]["r1"],
         r2=lambda wildcards: SAMPLES_MAP[wildcards.sample]["r2"]
     output:
-        r1=_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"),
-        r2=_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"),
+        r1=temp(_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz")),
+        r2=temp(_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz")),
         html=_append_res_dir("{sample}/qc/{sample}.html"),
-        json=_append_res_dir("{sample}/qc/{sample}.json")
+        json=temp(_append_res_dir("{sample}/qc/{sample}.json"))
     log:
         stdout="logs/{sample}/qc_trim.stdout.log",
         stderr="logs/{sample}/qc_trim.stderr.log"
@@ -155,9 +155,9 @@ rule map_reads:
         r1=_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz"),
         r2=_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz"),
     output:
-        sorted_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.bam"),
-        filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam"),
-        filtered_bai=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam.bai")
+        sorted_bam=temp(_append_res_dir("{sample}/mapping/{sample}.sorted.bam")),
+        filtered_bam=temp(_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam")),
+        filtered_bai=temp(_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam.bai"))
     log:
         stdout="logs/{sample}/map_reads.stdout.log",
         stderr="logs/{sample}/map_reads.stderr.log"
@@ -183,11 +183,12 @@ rule map_reads:
 
 rule split_bam_by_reference:
     input:
-        filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam")
+        filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam"),
+        filtered_bai=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam.bai")
     output:
         temp_bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.temp.bam")),
-        bam=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam"),
-        bai=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam.bai"),
+        bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam")),
+        bai=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam.bai")),
     log: 
         stdout="logs/{sample}/split_bam_{reference}.stdout.log",
         stderr="logs/{sample}/split_bam_{reference}.stderr.log"
@@ -211,8 +212,8 @@ rule trim_bam:
         split_bam=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam"),
     output:
         temp_bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.temp.bam")),
-        bam_trimmed=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam"),
-        bai_trimmed=_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam.bai")
+        bam_trimmed=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam")),
+        bai_trimmed=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.trimmed.bam.bai"))
     log: 
         stdout="logs/{sample}/trim_bam{reference}.stdout.log",
         stderr="logs/{sample}/trim_bam{reference}.stderr.log"
@@ -277,8 +278,8 @@ rule call_variants_ivar:
         bam=get_bam_input,
         ref=_masked_reference_fasta
     output:
-        temp_fasta=_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta"),
-        tsv=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv")
+        temp_fasta=temp(_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta")),
+        tsv=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv"))
     params:
         mpileup_A = "-A" if config.get("ivar_variant_mpileup_A", True) else "",
         mpileup_d = config.get("ivar_variant_mpileup_d", 0),
@@ -308,9 +309,8 @@ rule call_variants_ivar:
 rule transform_ivar_to_vcf:
     input:
         ivar_tsv=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv"),
-        temp_fasta=_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta"),
     output:        
-        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.vcf")
+        vcf=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.vcf"))
     log:
         stdout="logs/{sample}/transform_ivar_to_vcf_{reference}.stdout.log",
         stderr="logs/{sample}/transform_ivar_to_vcf_{reference}.stderr.log"
@@ -319,21 +319,17 @@ rule transform_ivar_to_vcf:
     conda:
         'requirements/requirements_var_to_vcf.yaml'
     params:
-        ref_name= lambda wildcards: wildcards.reference,
-        script=str(Path(workflow.basedir) / "external_scripts/ivar_variants_to_vcf.py"), 
-        # --ignore_strand_bias for amplicon runs, for now i always ignore it
-        options = "--ignore_strand_bias"
+        script=str(Path(workflow.basedir) / "external_scripts/galaxy/ivar_variants_to_vcf.py"), 
     shell:
         """
-        python {params.script} {input.ivar_tsv} {output.vcf} --fasta {input.temp_fasta} \
-        {params.options} > {log.stdout} 2> {log.stderr};
+        python {params.script} {input.ivar_tsv} {output.vcf} > {log.stdout} 2> {log.stderr};
         """
 
 rule filter_variants_lofreq:
     input:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.vcf")
     output:
-        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf")
+        vcf=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf"))
     params:
         lofreq_no_defaults = "--no-defaults " if config.get("lofreq_filter_no_defaults", True) else "",
         lofreq_v = config.get("lofreq_filter_v", 20),
