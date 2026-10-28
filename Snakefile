@@ -42,9 +42,6 @@ wildcard_constraints:
 
 rule all:
     input:
-        [_append_res_dir(f"{sample.strip()}/consensus/{sample}_{reference.strip()}_consensus.fa") for sample, reference in RUN_KEYS],
-        # [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
-        # [_append_res_dir(f"{sample}/visualization/{sample}_plot.html") for sample in SAMPLES]
         [_append_res_dir(f"{sample}/{sample}_plot.html") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.bam") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.consensus.fasta") for sample in SAMPLES],
@@ -63,7 +60,7 @@ rule mask_reference:
     input:
         unpack(_get_masking_input)
     output:
-        ref = _append_res_dir("references/{hash_value}/{hash_value}.masked.fasta")
+        ref =temp(_append_res_dir("references/{hash_value}/{hash_value}.masked.fasta"))
     log:
         stdout="logs/mask_reference/{hash_value}.stdout.log",
         stderr="logs/mask_reference/{hash_value}.stderr.log"
@@ -86,7 +83,7 @@ rule copy_reference:
     input:
         ref=_get_reference_fasta,
     output:
-        ref = _append_res_dir("references/{hash_value}/{hash_value}.unmasked.fasta")
+        ref =temp(_append_res_dir("references/{hash_value}/{hash_value}.unmasked.fasta"))
     log:
         stdout="logs/copy_reference/{hash_value}.stdout.log",
         stderr="logs/copy_reference/{hash_value}.stderr.log"
