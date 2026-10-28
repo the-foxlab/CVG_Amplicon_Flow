@@ -97,12 +97,12 @@ rule prepare_reference:
     input:
         ref = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta")
     output:
-        ref_fai = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.fai"),
-        ref_amb = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.amb"),
-        ref_ann = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.ann"),
-        ref_bwt = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.bwt"),
-        ref_pac = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.pac"),
-        ref_sa = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.sa"),
+        ref_fai =temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.fai")),
+        ref_amb = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.amb")),
+        ref_ann = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.ann")),
+        ref_bwt = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.bwt")),
+        ref_pac = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.pac")),
+        ref_sa = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.sa")),
     log:
         stdout="logs/prepare_reference/{hash_value}.{ref_type}.stdout.log",
         stderr="logs/prepare_reference/{hash_value}.{ref_type}.stderr.log"
