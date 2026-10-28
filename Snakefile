@@ -27,6 +27,8 @@ def _append_res_dir(p):
 def _masked_reference_fasta(wildcards):
     return masked_reference_fasta(SAMPLES_MAP[wildcards.sample], RES_DIR)
 
+def _masked_reference_fasta_index(wildcards):
+    return f"{_masked_reference_fasta(wildcards)}.fai"
 
 RES_DIR = config.get('res_dir')
 SAMPLES_MAP = load_samples(config)
@@ -60,7 +62,7 @@ rule mask_reference:
     input:
         unpack(_get_masking_input)
     output:
-        ref =temp(_append_res_dir("references/{hash_value}/{hash_value}.masked.fasta"))
+        ref=temp(_append_res_dir("references/{hash_value}/{hash_value}.masked.fasta"))
     log:
         stdout="logs/mask_reference/{hash_value}.stdout.log",
         stderr="logs/mask_reference/{hash_value}.stderr.log"
@@ -83,7 +85,7 @@ rule copy_reference:
     input:
         ref=_get_reference_fasta,
     output:
-        ref =temp(_append_res_dir("references/{hash_value}/{hash_value}.unmasked.fasta"))
+        ref=temp(_append_res_dir("references/{hash_value}/{hash_value}.unmasked.fasta"))
     log:
         stdout="logs/copy_reference/{hash_value}.stdout.log",
         stderr="logs/copy_reference/{hash_value}.stderr.log"
@@ -97,7 +99,7 @@ rule prepare_reference:
     input:
         ref = _append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta")
     output:
-        ref_fai =temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.fai")),
+        ref_fai = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.fai")),
         ref_amb = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.amb")),
         ref_ann = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.ann")),
         ref_bwt = temp(_append_res_dir("references/{hash_value}/{hash_value}.{ref_type}.fasta.bwt")),
@@ -277,7 +279,8 @@ rule create_consensus:
 rule call_variants_ivar:
     input:
         bam=get_bam_input,
-        ref=_masked_reference_fasta
+        ref=_masked_reference_fasta,
+        ref_index=_masked_reference_fasta_index
     output:
         temp_fasta=temp(_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta")),
         temp_fai=temp(_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta.fai")),
@@ -352,7 +355,8 @@ rule filter_variants_lofreq:
 rule bcftools_normalize_variants:
     input:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf"),
-        ref=_masked_reference_fasta
+        ref=_masked_reference_fasta,
+        ref_index=_masked_reference_fasta_index
     output:
         vcf=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz")),
         tbi=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz.tbi")),
