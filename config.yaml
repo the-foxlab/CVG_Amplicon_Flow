@@ -56,7 +56,6 @@ lofreq_filter_A : 0.0
 bcftools_normalize_check_ref: "w"
 bcftools_normalize_site_win: 1000
 bcftools_normalize_sort: "pos"
-bcftools_normalize_out_type: "v"
 
 # bamdash parameters
 bamdash_bs: 10

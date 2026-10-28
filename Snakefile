@@ -29,7 +29,6 @@ def _masked_reference_fasta(wildcards):
 
 
 RES_DIR = config.get('res_dir')
-print('cwd: ', Path.cwd())
 SAMPLES_MAP = load_samples(config)
 SAMPLES = sorted(SAMPLES_MAP.keys())[:1]
 RUN_KEYS = [(sample, reference) for sample in SAMPLES for reference in SAMPLES_MAP[sample]["references"]]
@@ -48,7 +47,8 @@ rule all:
         # [_append_res_dir(f"{sample}/visualization/{sample}_plot.html") for sample in SAMPLES]
         [_append_res_dir(f"{sample}/{sample}_plot.html") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.bam") for sample in SAMPLES],
-        [_append_res_dir(f"{sample}/{sample}.consensus.fasta") for sample in SAMPLES]
+        [_append_res_dir(f"{sample}/{sample}.consensus.fasta") for sample in SAMPLES],
+        [_append_res_dir(f"{sample}/{sample}.vcf") for sample in SAMPLES]
 
 
 def _get_masking_input(wildcards):
@@ -125,7 +125,7 @@ rule qc_trim:
     output:
         r1=temp(_append_res_dir("{sample}/qc/{sample}_R1.fastq.gz")),
         r2=temp(_append_res_dir("{sample}/qc/{sample}_R2.fastq.gz")),
-        html=_append_res_dir("{sample}/qc/{sample}.html"),
+        html=_append_res_dir("{sample}/{sample}.fastp.html"),
         json=temp(_append_res_dir("{sample}/qc/{sample}.json"))
     log:
         stdout="logs/{sample}/qc_trim.stdout.log",
@@ -252,7 +252,8 @@ rule create_consensus:
     input:
         bam=get_bam_input
     output:
-        _append_res_dir("{sample}/consensus/{sample}_{reference}_consensus.fa")
+        fasta=temp(_append_res_dir("{sample}/consensus/{sample}_{reference}_consensus.fa")),
+        qual=temp(_append_res_dir("{sample}/consensus/{sample}_{reference}_consensus.qual.txt"))
     params:
         min_quality=config.get("cons_ivar_min_variant_quality", 30),
         min_freq=config.get("cons_ivar_min_consensus_frequency", 0.75),
@@ -282,6 +283,7 @@ rule call_variants_ivar:
         ref=_masked_reference_fasta
     output:
         temp_fasta=temp(_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta")),
+        temp_fai=temp(_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta.fai")),
         tsv=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.tsv"))
     params:
         mpileup_A = "-A" if config.get("ivar_variant_mpileup_A", True) else "",
@@ -355,26 +357,29 @@ rule bcftools_normalize_variants:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf"),
         ref=_masked_reference_fasta
     output:
-        vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf")
+        vcf=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz")),
+        tbi=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz.tbi")),
+        input_gz=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf.gz")),
+        input_csi=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf.gz.csi"))
     params:
         check_ref=config.get("bcftools_normalize_check_ref", "w"),
         site_win=config.get("bcftools_normalize_site_win", 1000),
-        sort=config.get("bcftools_normalize_sort", "pos"),
-        out_type=config.get("bcftools_normalize_out_type", "v")
+        sort=config.get("bcftools_normalize_sort", "pos")
     conda:
         "requirements/requirements_bcftools.yaml"
     threads:
         4
     log:
-        stdout="logs/{sample}/filter_variants_lofreq_{reference}.stdout.log",
-        stderr="logs/{sample}/filter_variants_lofreq_{reference}.stderr.log"
+        stdout="logs/{sample}/bcftools_normalize_variants_{reference}.stdout.log",
+        stderr="logs/{sample}/bcftools_normalize_variants_{reference}.stderr.log"
     shell:
         """
-        bgzip -c {input.vcf} > {input.vcf}.gz 2> {log.stderr};
-        bcftools index {input.vcf}.gz > {log.stdout} 2>> {log.stderr};
+        bgzip -c {input.vcf} > {output.input_gz} 2> {log.stderr};
+        bcftools index {output.input_gz} > {log.stdout} 2>> {log.stderr};
         bcftools norm --fasta-ref {input.ref} --check-ref {params.check_ref} --site-win {params.site_win} \
-        --sort {params.sort} --output-type {params.out_type} \
-        --threads {threads} {input.vcf}.gz > {output.vcf} 2>> {log.stderr};
+        --sort {params.sort} --output-type z \
+        --threads {threads} -o {output.vcf} {output.input_gz} >> {log.stdout} 2>> {log.stderr};
+        bcftools index -t {output.vcf} >> {log.stdout} 2>> {log.stderr};
         """
 
 
@@ -390,22 +395,19 @@ def get_all_bams_per_sample(wildcards):
     return bam_files
 
 
-rule merge_files_together:
+rule merge_aln_and_cons_together:
     input:
         bam=get_all_bams_per_sample,
         bai=lambda wildcards: [f"{bam}.bai" for bam in get_all_bams_per_sample(wildcards)],
         fastas=lambda wildcards: [_append_res_dir(f"{wildcards.sample}/consensus/{wildcards.sample}_{reference}_consensus.fa")
-                                    for reference in  SAMPLES_MAP[wildcards.sample]["references"]],
-        vcfs=lambda wildcards: [_append_res_dir(f"{wildcards.sample}/variants/{wildcards.sample}_{reference}.ivar.lofreq_filtered.normalized.vcf")
                                     for reference in  SAMPLES_MAP[wildcards.sample]["references"]]
     output:
         merged_bam=_append_res_dir("{sample}/{sample}.bam"),
         merged_bai=_append_res_dir("{sample}/{sample}.bam.bai"),
         merged_fasta=_append_res_dir("{sample}/{sample}.consensus.fasta")
-        # merged_vcfs=_append_res_dir("{sample}/{sample}.vcf")
     log:
-        stdout=str(Path(workflow.basedir) / "logs/{sample}/merge_files_together.stdout.log"),
-        stderr=str(Path(workflow.basedir) / "logs/{sample}/merge_files_together.stderr.log")
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/merge_aln_and_cons_together.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/merge_aln_and_cons_together.stderr.log")
     conda:
         'requirements/requirements_aln.yaml'
     shell:
@@ -413,6 +415,25 @@ rule merge_files_together:
         samtools merge -o {output.merged_bam} {input.bam} > {log.stdout} 2> {log.stderr};
         samtools index {output.merged_bam} >> {log.stdout} 2>> {log.stderr};
         cat {input.fastas} > {output.merged_fasta} 2>> {log.stderr};
+        """
+
+
+rule merge_vcfs_together:
+    input:
+        vcfs=lambda wildcards: [_append_res_dir(f"{wildcards.sample}/variants/{wildcards.sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz")
+                                    for reference in  SAMPLES_MAP[wildcards.sample]["references"]],
+        tbis=lambda wildcards: [_append_res_dir(f"{wildcards.sample}/variants/{wildcards.sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz.tbi")
+                                    for reference in  SAMPLES_MAP[wildcards.sample]["references"]]
+    output:
+        merged_vcfs=_append_res_dir("{sample}/{sample}.vcf")
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/merge_vcfs_together.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/merge_vcfs_together.stderr.log")
+    conda:
+        "requirements/requirements_bcftools.yaml"
+    shell:
+        """
+        bcftools concat --output-type v -o {output.merged_vcfs} {input.vcfs} > {log.stdout} 2> {log.stderr};
         """
 
 

@@ -22,20 +22,19 @@ def test_bcftools_normalize_variants():
         shutil.copytree(data_path, workdir)
 
         # dbg
-        print("/mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed_downsampled/variants/1545554-HSV2_S82_not_trimmed_downsampled_HSV_2_UL23.ivar.lofreq_filtered.normalized.vcf", file=sys.stderr)
+        print("/mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed_downsampled/variants/1545554-HSV2_S82_not_trimmed_downsampled_HSV_2_UL23.ivar.lofreq_filtered.normalized.vcf.gz", file=sys.stderr)
 
         # Run the test job.
         sp.check_output([
             "python",
             "-m",
             "snakemake", 
-            "/mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed_downsampled/variants/1545554-HSV2_S82_not_trimmed_downsampled_HSV_2_UL23.ivar.lofreq_filtered.normalized.vcf",
+            "/mnt/common/researchers/udo_gieraths/galaxy_port_data/results/1545554-HSV2_S82_not_trimmed_downsampled/variants/1545554-HSV2_S82_not_trimmed_downsampled_HSV_2_UL23.ivar.lofreq_filtered.normalized.vcf.gz",
             "-f", 
             "-j1",
             "--keep-target-files",
             "--configfile",
-            /mnt/common/researchers/udo_gieraths/code/CVG_Amplicon_Flow/my_config.yaml
-    
+            "/mnt/common/researchers/udo_gieraths/code/CVG_Amplicon_Flow/my_config.yaml",
             "--use-conda",
             "--directory",
             workdir,
