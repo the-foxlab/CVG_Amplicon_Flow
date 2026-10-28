@@ -46,6 +46,9 @@ rule all:
         [_append_res_dir(f"{sample.strip()}/consensus/{sample}_{reference.strip()}_consensus.fa") for sample, reference in RUN_KEYS],
         # [_append_res_dir(f"{sample}/variants/{sample}_{reference_hash}.ivar.lofreq_filtered.normalized.vcf") for sample, reference_hash in RUN_KEYS[:]],
         # [_append_res_dir(f"{sample}/visualization/{sample}_plot.html") for sample in SAMPLES]
+        [_append_res_dir(f"{sample}/{sample}_plot.html") for sample in SAMPLES],
+        [_append_res_dir(f"{sample}/{sample}.bam") for sample in SAMPLES],
+        [_append_res_dir(f"{sample}/{sample}.consensus.fasta") for sample in SAMPLES]
 
 
 def _get_masking_input(wildcards):
@@ -386,26 +389,49 @@ def get_all_bams_per_sample(wildcards):
             bam_files.append(_append_res_dir(f"{wildcards.sample}/mapping/{wildcards.sample}_{reference}.sorted.filtered.bam"))
     return bam_files
 
-rule visualize_bam_bamdash:
+
+rule merge_files_together:
     input:
         bam=get_all_bams_per_sample,
-        bai=lambda wildcards: [f"{bam}.bai" for bam in get_all_bams_per_sample(wildcards)]
+        bai=lambda wildcards: [f"{bam}.bai" for bam in get_all_bams_per_sample(wildcards)],
+        fastas=lambda wildcards: [_append_res_dir(f"{wildcards.sample}/consensus/{wildcards.sample}_{reference}_consensus.fa")
+                                    for reference in  SAMPLES_MAP[wildcards.sample]["references"]],
+        vcfs=lambda wildcards: [_append_res_dir(f"{wildcards.sample}/variants/{wildcards.sample}_{reference}.ivar.lofreq_filtered.normalized.vcf")
+                                    for reference in  SAMPLES_MAP[wildcards.sample]["references"]]
     output:
-        temp_bam = temp(_append_res_dir("{sample}/visualization/{sample}_merged.bam")),
-        temp_bai = temp(_append_res_dir("{sample}/visualization/{sample}_merged.bam.bai")),
-        html=_append_res_dir("{sample}/visualization/{sample}_plot.html"),
+        merged_bam=_append_res_dir("{sample}/{sample}.bam"),
+        merged_bai=_append_res_dir("{sample}/{sample}.bam.bai"),
+        merged_fasta=_append_res_dir("{sample}/{sample}.consensus.fasta")
+        # merged_vcfs=_append_res_dir("{sample}/{sample}.vcf")
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/merge_files_together.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/merge_files_together.stderr.log")
+    conda:
+        'requirements/requirements_aln.yaml'
+    shell:
+        """
+        samtools merge -o {output.merged_bam} {input.bam} > {log.stdout} 2> {log.stderr};
+        samtools index {output.merged_bam} >> {log.stdout} 2>> {log.stderr};
+        cat {input.fastas} > {output.merged_fasta} 2>> {log.stderr};
+        """
+
+
+rule visualize_bam_bamdash:
+    input:
+        bam=_append_res_dir("{sample}/{sample}.bam"),
+        bai=_append_res_dir("{sample}/{sample}.bam.bai"),
+    output:
+        html=_append_res_dir("{sample}/{sample}_plot.html"),
     log:
         stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stderr.log")
     params:
-        prefix = _append_res_dir("{sample}/visualization/{sample}_plot"),
+        prefix = _append_res_dir("{sample}/{sample}_plot"),
         bs = config.get("bamdash_bs", 10),
         add_track = lambda wildcards: f"-t {SAMPLES_MAP[wildcards.sample]['bed']}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        samtools merge -o {output.temp_bam} {input.bam} > {log.stdout} 2> {log.stderr};
-        samtools index {output.temp_bam} >> {log.stdout} 2>> {log.stderr};
-        bamdash --bam {output.temp_bam} -bs {params.bs} -p {params.prefix} {params.add_track} >> {log.stdout} 2>> {log.stderr};
+        bamdash --bam {input.bam} -bs {params.bs} -p {params.prefix} {params.add_track} >> {log.stdout} 2>> {log.stderr};
         """
