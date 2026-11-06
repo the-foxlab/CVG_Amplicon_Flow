@@ -72,8 +72,8 @@ rule mask_reference:
         "requirements/requirements_mask_refs.yaml"
     shell:
         """
-        python {params.script} --fasta {input.ref} --bed {input.bed} --output {output.ref} \
-            > {log.stdout} 2> {log.stderr}
+        python {params.script:q} --fasta {input.ref:q} --bed {input.bed:q} --output {output.ref:q} \
+            > {log.stdout:q} 2> {log.stderr:q}
         """
 
 def _get_reference_fasta(wildcards):
@@ -91,7 +91,7 @@ rule copy_reference:
         stderr="logs/copy_reference/{hash_value}.stderr.log"
     shell:
         """
-        cp {input.ref} {output.ref} > {log.stdout} 2> {log.stderr}
+        cp {input.ref:q} {output.ref:q} > {log.stdout:q} 2> {log.stderr:q}
         """
 
 
@@ -112,8 +112,8 @@ rule prepare_reference:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        samtools faidx {input.ref} > {log.stdout} 2> {log.stderr}
-        bwa index {input.ref} >> {log.stdout} 2>> {log.stderr}
+        samtools faidx {input.ref:q} > {log.stdout:q} 2> {log.stderr:q}
+        bwa index {input.ref:q} >> {log.stdout:q} 2>> {log.stderr:q}
         """
 
 
@@ -139,11 +139,11 @@ rule qc_trim:
         "requirements/requirements_fastp.yaml"
     shell:
         """
-        fastp --thread {threads} -i {input.r1} -I {input.r2} -o {output.r1} -O {output.r2} \
-            -h {output.html} -j {output.json} \
+        fastp --thread {threads} -i {input.r1:q} -I {input.r2:q} -o {output.r1:q} -O {output.r2:q} \
+            -h {output.html:q} -j {output.json:q} \
             --qualified_quality_phred {params.min_quality} \
             --length_required {params.min_length} --dont_eval_duplication \
-            {params.extra} > {log.stdout} 2> {log.stderr}
+            {params.extra} > {log.stdout:q} 2> {log.stderr:q}
         """
 
 rule map_reads:
@@ -176,10 +176,10 @@ rule map_reads:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        bwa mem -t {threads} -T {params.T} -h {params.h} {params.extra} {input.ref} {input.r1} {input.r2} 2> {log.stderr} \
-            | samtools sort -o {output.sorted_bam} - > {log.stdout} 2>> {log.stderr}; 
-        samtools view -b -f {params.sam_f} -F {params.sam_F} -q {params.min_mapping_quality} -o {output.filtered_bam} {output.sorted_bam} >> {log.stdout} 2>> {log.stderr};
-        samtools index {output.filtered_bam} >> {log.stdout} 2>> {log.stderr};
+        bwa mem -t {threads} -T {params.T} -h {params.h} {params.extra} {input.ref:q} {input.r1:q} {input.r2:q} 2> {log.stderr:q} \
+            | samtools sort -o {output.sorted_bam:q} - > {log.stdout:q} 2>> {log.stderr:q}; 
+        samtools view -b -f {params.sam_f} -F {params.sam_F} -q {params.min_mapping_quality} -o {output.filtered_bam:q} {output.sorted_bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
+        samtools index {output.filtered_bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
         """
 
 
@@ -202,10 +202,10 @@ rule split_bam_by_reference:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        samtools view -h {input.filtered_bam} {wildcards.reference} | egrep -v '{params.exclude_refs}' \
-        | samtools view -bhS - > {output.temp_bam} 2> {log.stderr};
-        samtools sort -o {output.bam} {output.temp_bam} >> {log.stdout} 2>> {log.stderr};
-        samtools index {output.bam} >> {log.stdout} 2>> {log.stderr};
+        samtools view -h {input.filtered_bam:q} {wildcards.reference:q} | egrep -v {params.exclude_refs:q} \
+        | samtools view -bhS - > {output.temp_bam:q} 2> {log.stderr:q};
+        samtools sort -o {output.bam:q} {output.temp_bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
+        samtools index {output.bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
         """
 
 
@@ -230,12 +230,12 @@ rule trim_bam:
         'requirements/requirements_aln.yaml'
     shell:
         """        
-        echo "$(date '+%Y-%m-%d %H:%M:%S') Starting ivar trim" >> {log.stdout};
-        ivar trim -i {input.split_bam} -b {params.bed_fn} -p {params.prefix} \
-        -x {params.trim_offset} -e -m {params.min_len_after_trimming} -q {params.trim_q} -s {params.trim_s}  >> {log.stdout} 2>> {log.stderr};
-        echo "$(date '+%Y-%m-%d %H:%M:%S') Done with ivar trim" >> {log.stdout};
-        samtools sort -o {output.bam_trimmed} {output.temp_bam} >> {log.stdout} 2>> {log.stderr};
-        samtools index {output.bam_trimmed} >> {log.stdout} 2>> {log.stderr};
+        echo "$(date '+%Y-%m-%d %H:%M:%S') Starting ivar trim" >> {log.stdout:q};
+        ivar trim -i {input.split_bam:q} -b {params.bed_fn:q} -p {params.prefix:q} \
+        -x {params.trim_offset} -e -m {params.min_len_after_trimming} -q {params.trim_q} -s {params.trim_s}  >> {log.stdout:q} 2>> {log.stderr:q};
+        echo "$(date '+%Y-%m-%d %H:%M:%S') Done with ivar trim" >> {log.stdout:q};
+        samtools sort -o {output.bam_trimmed:q} {output.temp_bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
+        samtools index {output.bam_trimmed:q} >> {log.stdout:q} 2>> {log.stderr:q};
         """
 
 
@@ -271,9 +271,9 @@ rule create_consensus:
     shell:
         """
         samtools mpileup {params.mpileup_A} {params.mpileup_a} -d {params.mpileup_d} -Q {params.mpileup_Q} \
-         {input.bam} 2> {log.stderr} | \
-        ivar consensus -p {params.prefix} -q {params.min_quality} -t {params.min_freq} -c {params.min_insertion_freq} \
-         -m {params.min_depth} -n N > {log.stdout} 2>> {log.stderr};
+         {input.bam:q} 2> {log.stderr:q} | \
+        ivar consensus -p {params.prefix:q} -q {params.min_quality} -t {params.min_freq} -c {params.min_insertion_freq} \
+         -m {params.min_depth} -n N > {log.stdout:q} 2>> {log.stderr:q};
         """
 
 rule call_variants_ivar:
@@ -302,11 +302,11 @@ rule call_variants_ivar:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        samtools faidx {input.ref} {params.ref_name} > {output.temp_fasta} 2> {log.stderr};
+        samtools faidx {input.ref:q} {params.ref_name:q} > {output.temp_fasta:q} 2> {log.stderr:q};
         samtools mpileup {params.mpileup_A} -d {params.mpileup_d} {params.mpileup_B} -Q {params.mpileup_Q} \
-        --reference {output.temp_fasta} {input.bam} 2>> {log.stderr} | \
-        ivar variants -p {params.ivar_prefix} -q {params.ivar_q} -t {params.ivar_t} -r {input.ref} \
-            > {log.stdout} 2>> {log.stderr};                
+        --reference {output.temp_fasta:q} {input.bam:q} 2>> {log.stderr:q} | \
+        ivar variants -p {params.ivar_prefix:q} -q {params.ivar_q} -t {params.ivar_t} -r {input.ref:q} \
+            > {log.stdout:q} 2>> {log.stderr:q};
         """
 
 
@@ -327,7 +327,7 @@ rule transform_ivar_to_vcf:
         script=str(Path(workflow.basedir) / "external_scripts/galaxy/ivar_variants_to_vcf.py"), 
     shell:
         """
-        python {params.script} {input.ivar_tsv} {output.vcf} > {log.stdout} 2> {log.stderr};
+        python {params.script:q} {input.ivar_tsv:q} {output.vcf:q} > {log.stdout:q} 2> {log.stderr:q};
         """
 
 rule filter_variants_lofreq:
@@ -348,8 +348,8 @@ rule filter_variants_lofreq:
         stderr="logs/{sample}/filter_variants_lofreq_{reference}.stderr.log"
     shell:
         """
-        lofreq filter -i {input.vcf} {params.lofreq_no_defaults} --verbose -v {params.lofreq_v} -V {params.lofreq_V} \
-            -a {params.lofreq_a} -A {params.lofreq_A} -o {output.vcf} > {log.stdout} 2> {log.stderr};
+        lofreq filter -i {input.vcf:q} {params.lofreq_no_defaults} --verbose -v {params.lofreq_v} -V {params.lofreq_V} \
+            -a {params.lofreq_a} -A {params.lofreq_A} -o {output.vcf:q} > {log.stdout:q} 2> {log.stderr:q};
         """
 
 rule bcftools_normalize_variants:
@@ -375,12 +375,12 @@ rule bcftools_normalize_variants:
         stderr="logs/{sample}/bcftools_normalize_variants_{reference}.stderr.log"
     shell:
         """
-        bgzip -c {input.vcf} > {output.input_gz} 2> {log.stderr};
-        bcftools index {output.input_gz} > {log.stdout} 2>> {log.stderr};
-        bcftools norm --fasta-ref {input.ref} --check-ref {params.check_ref} --site-win {params.site_win} \
+        bgzip -c {input.vcf:q} > {output.input_gz:q} 2> {log.stderr:q};
+        bcftools index {output.input_gz:q} > {log.stdout:q} 2>> {log.stderr:q};
+        bcftools norm --fasta-ref {input.ref:q} --check-ref {params.check_ref} --site-win {params.site_win} \
         --sort {params.sort} --output-type z \
-        --threads {threads} -o {output.vcf} {output.input_gz} >> {log.stdout} 2>> {log.stderr};
-        bcftools index -t {output.vcf} >> {log.stdout} 2>> {log.stderr};
+        --threads {threads} -o {output.vcf:q} {output.input_gz:q} >> {log.stdout:q} 2>> {log.stderr:q};
+        bcftools index -t {output.vcf:q} >> {log.stdout:q} 2>> {log.stderr:q};
         """
 
 
@@ -413,9 +413,9 @@ rule merge_aln_and_cons_together:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        samtools merge -o {output.merged_bam} {input.bam} > {log.stdout} 2> {log.stderr};
-        samtools index {output.merged_bam} >> {log.stdout} 2>> {log.stderr};
-        cat {input.fastas} > {output.merged_fasta} 2>> {log.stderr};
+        samtools merge -o {output.merged_bam:q} {input.bam:q} > {log.stdout:q} 2> {log.stderr:q};
+        samtools index {output.merged_bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
+        cat {input.fastas:q} > {output.merged_fasta:q} 2>> {log.stderr:q};
         """
 
 
@@ -434,7 +434,7 @@ rule merge_vcfs_together:
         "requirements/requirements_bcftools.yaml"
     shell:
         """
-        bcftools concat --output-type v -o {output.merged_vcfs} {input.vcfs} > {log.stdout} 2> {log.stderr};
+        bcftools concat --output-type v -o {output.merged_vcfs:q} {input.vcfs:q} > {log.stdout:q} 2> {log.stderr:q};
         """
 
 
@@ -450,10 +450,10 @@ rule visualize_bam_bamdash:
     params:
         prefix = _append_res_dir("{sample}/{sample}_plot"),
         bs = config.get("bamdash_bs", 10),
-        add_track = lambda wildcards: f"-t {SAMPLES_MAP[wildcards.sample]['bed']}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
+        add_track = lambda wildcards: f"-t '{SAMPLES_MAP[wildcards.sample]['bed']}'" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam} -bs {params.bs} -p {params.prefix} {params.add_track} >> {log.stdout} 2>> {log.stderr};
+        bamdash --bam {input.bam:q} -bs {params.bs} -p {params.prefix:q} {params.add_track} >> {log.stdout:q} 2>> {log.stderr:q};
         """
