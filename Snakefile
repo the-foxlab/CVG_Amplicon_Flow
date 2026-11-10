@@ -450,10 +450,13 @@ rule visualize_bam_bamdash:
     params:
         prefix = _append_res_dir("{sample}/{sample}_plot"),
         bs = config.get("bamdash_bs", 10),
+        coverage = config.get("bamdash_coverage", 10),
+        mapping_quality = config.get("bamdash_mapping_quality", 30),
+        filetype = "html svg" if config.get("bamdash_static", True) else "html",
         add_track = lambda wildcards: f"-t {SAMPLES_MAP[wildcards.sample]['bed']}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam} -bs {params.bs} -p {params.prefix} {params.add_track} >> {log.stdout} 2>> {log.stderr};
+        bamdash --bam {input.bam} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix} {params.add_track} >> {log.stdout} 2>> {log.stderr};
         """

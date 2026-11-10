@@ -8,6 +8,7 @@ galaxy_workflow_export.ga
 *.sif
 sample_sheet.csv
 my_config.yaml
+raw_data/
 
 __pycache__/
 *.py[codz]
