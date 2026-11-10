@@ -62,3 +62,4 @@ bamdash_bs: 10
 bamdash_coverage: 10
 bamdash_mapping_quality: 30
 bamdash_static: True
+bamdash_offline: False
