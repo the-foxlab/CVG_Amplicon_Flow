@@ -438,10 +438,37 @@ rule merge_vcfs_together:
         """
 
 
+def _amplicon_bed(wildcards):
+    """Path of the derived amplicon BED, only when a primer BED is configured."""
+    if SAMPLES_MAP[wildcards.sample]["bed"]:
+        return _append_res_dir(f"{wildcards.sample}/{wildcards.sample}.amplicons.bed")
+    return []
+
+
+rule primers_to_amplicons:
+    input:
+        bed=lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
+    output:
+        bed=_append_res_dir("{sample}/{sample}.amplicons.bed"),
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stderr.log")
+    params:
+        script=str(Path(workflow.basedir) / "scripts/primers_to_amplicons.py")
+    conda:
+        "requirements/requirements_primers_to_amplicons.yaml"
+    shell:
+        """
+        python {params.script} {input.bed} {output.bed} \
+            > {log.stdout} 2> {log.stderr}
+        """
+
+
 rule visualize_bam_bamdash:
     input:
         bam=_append_res_dir("{sample}/{sample}.bam"),
         bai=_append_res_dir("{sample}/{sample}.bam.bai"),
+        amplicon_bed=_amplicon_bed,
     output:
         html=_append_res_dir("{sample}/{sample}_plot.html"),
     log:
@@ -453,7 +480,7 @@ rule visualize_bam_bamdash:
         coverage = config.get("bamdash_coverage", 10),
         mapping_quality = config.get("bamdash_mapping_quality", 30),
         filetype = "html svg" if config.get("bamdash_static", True) else "html",
-        add_track = lambda wildcards: f"-t {SAMPLES_MAP[wildcards.sample]['bed']}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
+        add_track = lambda wildcards: f"-t {SAMPLES_MAP[wildcards.sample]['bed']} {_append_res_dir(f'{wildcards.sample}/{wildcards.sample}.amplicons.bed')}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
