@@ -1,0 +1,4 @@
+# Dependencies for running the script unit tests (see .github/workflows/tests.yml).
+# Python itself comes from the CI matrix (3.11-3.14), so it is not pinned here.
+biopython>=1.88
+pytest

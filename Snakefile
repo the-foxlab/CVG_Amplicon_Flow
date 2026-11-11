@@ -438,10 +438,38 @@ rule merge_vcfs_together:
         """
 
 
+def _amplicon_bed(wildcards):
+    """Path of the derived amplicon BED, only when a primer BED is configured."""
+    if SAMPLES_MAP[wildcards.sample]["bed"]:
+        return _append_res_dir(f"{wildcards.sample}/{wildcards.sample}.amplicons.bed")
+    return []
+
+
+rule primers_to_amplicons:
+    input:
+        bed=lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
+    output:
+        bed=_append_res_dir("{sample}/{sample}.amplicons.bed"),
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stderr.log")
+    params:
+        script=str(Path(workflow.basedir) / "scripts/primers_to_amplicons.py")
+    conda:
+        "requirements/requirements_primers_to_amplicons.yaml"
+    shell:
+        """
+        python {params.script} {input.bed} {output.bed} \
+            > {log.stdout} 2> {log.stderr}
+        """
+
+
 rule visualize_bam_bamdash:
     input:
         bam=_append_res_dir("{sample}/{sample}.bam"),
         bai=_append_res_dir("{sample}/{sample}.bam.bai"),
+        vcf=_append_res_dir("{sample}/{sample}.vcf"),
+        amplicon_bed=_amplicon_bed,
     output:
         html=_append_res_dir("{sample}/{sample}_plot.html"),
     log:
@@ -450,10 +478,14 @@ rule visualize_bam_bamdash:
     params:
         prefix = _append_res_dir("{sample}/{sample}_plot"),
         bs = config.get("bamdash_bs", 10),
-        add_track = lambda wildcards: f"-t '{SAMPLES_MAP[wildcards.sample]['bed']}'" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
+        coverage = config.get("bamdash_coverage", 10),
+        mapping_quality = config.get("bamdash_mapping_quality", 30),
+        filetype = "html svg" if config.get("bamdash_static", True) else "html",
+        offline = "--offline" if config.get("bamdash_offline", True) else "--no-offline",
+        add_track = lambda wildcards: f"{SAMPLES_MAP[wildcards.sample]['bed']} {_amplicon_bed(wildcards)}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam:q} -bs {params.bs} -p {params.prefix:q} {params.add_track} >> {log.stdout:q} 2>> {log.stderr:q};
+        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track} {params.offline} > {log.stdout:q} 2> {log.stderr:q};
         """
