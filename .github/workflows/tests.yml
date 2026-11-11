@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/**"
+      - "requirements_pytest.txt"
+      - ".github/workflows/tests.yml"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -r requirements_pytest.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
