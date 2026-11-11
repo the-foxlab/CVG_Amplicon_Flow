@@ -23,11 +23,8 @@ def primer_bed(tmp_path: Path) -> Path:
 	return path
 
 
-def test_build_amplicons_merges_primer_pairs() -> None:
-	entries = read_primer_bed(
-		Path("raw_data/HSV_1_UL23_UL30.bed")
-	)
-
+def test_build_amplicons_merges_primer_pairs(primer_bed: Path) -> None:
+	entries = read_primer_bed(primer_bed)
 	amplicons = build_amplicons(entries)
 
 	assert len(amplicons) == len(entries) // 2
