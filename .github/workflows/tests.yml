@@ -8,7 +8,8 @@ on:
       - "scripts/**"
       - "requirements_pytest.txt"
       - ".github/workflows/tests.yml"
-
+  workflow_dispatch:
+    
 jobs:
   pytest:
     runs-on: ubuntu-latest
