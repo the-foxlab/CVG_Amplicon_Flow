@@ -90,6 +90,7 @@ def load_samples_from_sheet(sample_sheet: str) -> dict[str, dict[str, Any]]:
         raise ValueError("sample_sheet must contain columns: sample, reference_fasta, r1, r2")
 
     has_bed_column = "bed" in set(table.columns)
+    has_respro_db_column = "respro_db" in set(table.columns)
 
     for row in table.itertuples(index=False):
         sample = str(row.sample).strip()
@@ -99,7 +100,8 @@ def load_samples_from_sheet(sample_sheet: str) -> dict[str, dict[str, Any]]:
         reference_fasta = str(row.reference_fasta).strip()
         r1 = str(row.r1).strip()
         r2 = str(row.r2).strip()
-        bed = str(row.bed).strip() if has_bed_column else ""
+        bed = "" if (not has_bed_column or is_missing(row.bed)) else str(row.bed).strip()
+        respro_db = "" if (not has_respro_db_column or is_missing(row.respro_db)) else str(row.respro_db).strip()
 
         if is_missing(reference_fasta) or is_missing(r1) or is_missing(r2):
             raise ValueError(f"Sample '{sample}' has missing reference_fasta, r1 or r2 in sample_sheet")
@@ -123,7 +125,8 @@ def load_samples_from_sheet(sample_sheet: str) -> dict[str, dict[str, Any]]:
 
         samples[sample] = {
             "reference_fasta": reference_fasta,
-            "bed": "" if is_missing(bed) else bed,
+            "bed": bed,
+            "respro_db": respro_db,
             "r1": r1,
             "r2": r2,
             "references": effective_references,
