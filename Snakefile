@@ -454,7 +454,7 @@ rule primers_to_amplicons:
     input:
         bed=lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
     output:
-        bed=_append_res_dir("{sample}/{sample}.amplicons.bed"),
+        bed=temp(_append_res_dir("{sample}/{sample}.amplicons.bed")),
     log:
         stdout=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stderr.log")
