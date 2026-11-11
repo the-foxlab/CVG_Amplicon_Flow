@@ -482,10 +482,10 @@ rule visualize_bam_bamdash:
         mapping_quality = config.get("bamdash_mapping_quality", 30),
         filetype = "html svg" if config.get("bamdash_static", True) else "html",
         offline = "--offline" if config.get("bamdash_offline", True) else "--no-offline",
-        add_track = lambda wildcards: f"{SAMPLES_MAP[wildcards.sample]['bed']} {_append_res_dir(f'{wildcards.sample}/{wildcards.sample}.amplicons.bed')}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
+        add_track = lambda wildcards: f"{SAMPLES_MAP[wildcards.sample]['bed']} {_amplicon_bed(wildcards)}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix} -t {input.vcf} {params.add_track} {params.offline} > {log.stdout} 2> {log.stderr};
+        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track} {params.offline} > {log.stdout:q} 2> {log.stderr:q};
         """
