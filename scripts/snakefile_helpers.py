@@ -100,8 +100,8 @@ def load_samples_from_sheet(sample_sheet: str) -> dict[str, dict[str, Any]]:
         reference_fasta = str(row.reference_fasta).strip()
         r1 = str(row.r1).strip()
         r2 = str(row.r2).strip()
-        bed = "" if (not has_bed_column or is_missing(row.bed)) else str(row.bed).strip()
-        respro_db = "" if (not has_respro_db_column or is_missing(row.respro_db)) else str(row.respro_db).strip()
+        bed = str(row.bed).strip() if has_bed_column else ""
+        respro_db = str(row.respro_db).strip() if has_respro_db_column else ""
 
         if is_missing(reference_fasta) or is_missing(r1) or is_missing(r2):
             raise ValueError(f"Sample '{sample}' has missing reference_fasta, r1 or r2 in sample_sheet")
@@ -125,8 +125,8 @@ def load_samples_from_sheet(sample_sheet: str) -> dict[str, dict[str, Any]]:
 
         samples[sample] = {
             "reference_fasta": reference_fasta,
-            "bed": bed,
-            "respro_db": respro_db,
+            "bed": "" if is_missing(bed) else bed,
+            "respro_db": "" if is_missing(respro_db) else respro_db,
             "r1": r1,
             "r2": r2,
             "references": effective_references,
