@@ -5,15 +5,11 @@ import sys
 
 sys.path.insert(0, str(Path(workflow.basedir) / "scripts"))
 
-from snakefile_helpers import append_res_dir, build_bwa_files, load_samples, masked_reference_fasta
-
-
-def _reference_fasta(wildcards):
-    return SAMPLES_MAP[wildcards.sample]["reference_fasta"]
+from snakefile_helpers import append_res_dir, build_bwa_file_names, load_samples 
 
 
 def _all_bwa_files(wildcards):
-    return build_bwa_files(SAMPLES_MAP[wildcards.sample], RES_DIR)
+    return build_bwa_file_names(SAMPLES_MAP[wildcards.sample], RES_DIR)
 
     
 def _bed_file(wildcards):
@@ -28,11 +24,11 @@ def _append_res_dir(p):
     return append_res_dir(RES_DIR, p)
 
 
-def _masked_reference_fasta(wildcards):
-    return masked_reference_fasta(SAMPLES_MAP[wildcards.sample], RES_DIR)
+def _get_indexed_reference_fasta(wildcards):
+    return build_bwa_file_names(SAMPLES_MAP[wildcards.sample], RES_DIR)["ref"]
 
-def _masked_reference_fasta_index(wildcards):
-    return f"{_masked_reference_fasta(wildcards)}.fai"
+def _get_indexed_reference_fasta_index(wildcards):
+    return build_bwa_file_names(SAMPLES_MAP[wildcards.sample], RES_DIR)["ref_fai"]
 
 RES_DIR = config.get('res_dir')
 SAMPLES_MAP = load_samples(config)
@@ -284,8 +280,8 @@ rule create_consensus:
 rule call_variants_ivar:
     input:
         bam=get_bam_input,
-        ref=_masked_reference_fasta,
-        ref_index=_masked_reference_fasta_index
+        ref=_get_indexed_reference_fasta,
+        ref_index=_get_indexed_reference_fasta_index
     output:
         temp_fasta=temp(_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta")),
         temp_fai=temp(_append_res_dir("{sample}/variants/{sample}_{reference}_temp_ref_file.fasta.fai")),
@@ -360,8 +356,8 @@ rule filter_variants_lofreq:
 rule bcftools_normalize_variants:
     input:
         vcf=_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.vcf"),
-        ref=_masked_reference_fasta,
-        ref_index=_masked_reference_fasta_index
+        ref=_get_indexed_reference_fasta,
+        ref_index=_get_indexed_reference_fasta_index
     output:
         vcf=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz")),
         tbi=temp(_append_res_dir("{sample}/variants/{sample}_{reference}.ivar.lofreq_filtered.normalized.vcf.gz.tbi")),
