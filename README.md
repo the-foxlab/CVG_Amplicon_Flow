@@ -14,6 +14,7 @@ The primary goal is to offer a simple, automated pipeline for generating **conse
   * Consensus genomes (`.fasta`)
   * Called variants (`.vcf`)
   * Interactive alignment visualizations via [BAMdash](https://github.com/jonas-fuchs/BAMdash).
+  * Resistance genotyping with ResistanceProfiler
 
 ## Current pipeline behavior
 
@@ -35,6 +36,7 @@ The active workflow performs these steps (from preprocessing through variant ana
 | Filter variants | `filter_variants_lofreq` | lofreq |
 | Normalize variants | `bcftools_normalize_variants` | bcftools, bgzip |
 | Generate BAM visualization HTML | `visualize_bam_bamdash` | bamdash |
+| Genotype results for antiviral resistance | `profile_with_respro` | respro |
 
 
 ## Sample sheet 
@@ -53,6 +55,7 @@ Optional column:
 | Column | Meaning |
 |---|---|
 | `bed` | Primer BED file; enables masking + `trim_bam` branch |
+| `respro_db` | ResistanceProfiler database that should be used for a resistance phenotyping result |
 
 Validation performed by the workflow:
 
@@ -63,10 +66,10 @@ Validation performed by the workflow:
 
 Example format (dummy paths):
 
-| sample | reference_fasta | bed | r1 | r2 |
-|---|---|---|---|---|
-| sample_trimmed | /data/refs/hsv2_multi.fasta | /data/beds/hsv2_primers.bed | /data/fastqs/sample_R1.fastq.gz | /data/fastqs/sample_R2.fastq.gz |
-| sample_untrimmed | /data/refs/hsv2_multi.fasta | | /data/fastqs/sample_R1.fastq.gz | /data/fastqs/sample_R2.fastq.gz |
+| sample | reference_fasta | respro_db | bed | r1 | r2 |
+|---|---|---|---|---|---|
+| sample_trimmed | /data/refs/hsv2_multi.fasta | /data/respro/database.db | /data/beds/hsv2_primers.bed | /data/fastqs/sample_R1.fastq.gz | /data/fastqs/sample_R2.fastq.gz |
+| sample_untrimmed | /data/refs/hsv2_multi.fasta | /data/respro/database.db | | /data/fastqs/sample_R1.fastq.gz | /data/fastqs/sample_R2.fastq.gz |
 
 ## Output layout
 

@@ -20,6 +20,10 @@ def _bed_file(wildcards):
     return SAMPLES_MAP[wildcards.sample].get("bed") or ""
 
 
+def _respro_db_file(wildcards):
+    return SAMPLES_MAP[wildcards.sample].get("respro_db") or ""
+
+
 def _append_res_dir(p):
     return append_res_dir(RES_DIR, p)
 
@@ -47,7 +51,8 @@ rule all:
         [_append_res_dir(f"{sample}/{sample}_plot.html") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.bam") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.consensus.fasta") for sample in SAMPLES],
-        [_append_res_dir(f"{sample}/{sample}.vcf") for sample in SAMPLES]
+        [_append_res_dir(f"{sample}/{sample}.vcf") for sample in SAMPLES],
+        [_append_res_dir(f"{sample}/{sample}.respro.html") for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")]
 
 
 def _get_masking_input(wildcards):
@@ -449,7 +454,7 @@ rule primers_to_amplicons:
     input:
         bed=lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
     output:
-        bed=_append_res_dir("{sample}/{sample}.amplicons.bed"),
+        bed=temp(_append_res_dir("{sample}/{sample}.amplicons.bed")),
     log:
         stdout=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/{sample}/primers_to_amplicons.stderr.log")
@@ -489,3 +494,38 @@ rule visualize_bam_bamdash:
         """
         bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track} {params.offline} > {log.stdout:q} 2> {log.stderr:q};
         """
+
+
+rule profile_with_respro:
+    """
+    Optionally profile the sequencing
+    """
+    input:
+        bam=_append_res_dir("{sample}/{sample}.bam"),
+        bai=_append_res_dir("{sample}/{sample}.bam.bai"),
+        ref=_masked_reference_fasta,
+        vcf=_append_res_dir("{sample}/{sample}.vcf"),
+        respro_db=_respro_db_file
+    output:
+        html = _append_res_dir("{sample}/{sample}.respro.html"),
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/{sample}/profile_with_respro.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/{sample}/profile_with_respro.stderr.log")
+    params:
+        depth=config.get("respro_min_depth", 10),
+        af=config.get("respro_min_af", 0.01),
+        # addtional export formats for respro, all are optional but enabled by default
+        json='-e json' if config.get("respro_export_json", True) else '',
+        pdf='-e pdf' if config.get("respro_export_pdf", True) else '',
+        tsv='-e tsv' if config.get("respro_export_tsv", True) else '',
+
+    conda:
+        "requirements/requirements_respro.yaml"
+    shell:
+        """
+        respro vcf --project {input.respro_db:q} --vcf {input.vcf:q} --ref-fasta {input.ref:q} \
+            --sample {wildcards.sample} --bam {input.bam:q} \
+            --min-depth {params.depth} --min-af {params.af} {params.json} {params.pdf} {params.tsv} \
+            --output {output.html:q} > {log.stdout:q} 2> {log.stderr:q};
+        """
+    

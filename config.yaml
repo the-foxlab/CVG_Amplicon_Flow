@@ -1,7 +1,7 @@
 # Required sample sheet columns:
 # sample, reference_fasta, r1, r2
-# Optional sample sheet column:
-# bed
+# Optional sample sheet columns:
+# bed, respro_db
 sample_sheet: example_sample_sheet.csv
 res_dir: /path/to/results_directory
 
@@ -63,3 +63,10 @@ bamdash_coverage: 10
 bamdash_mapping_quality: 30
 bamdash_static: True
 bamdash_offline: False
+
+# respro parameters
+respro_min_af: 0.01
+respro_min_depth: 10
+respro_export_pdf: True
+respro_export_json: True
+respro_export_tsv: True
