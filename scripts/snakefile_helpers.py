@@ -153,7 +153,7 @@ def append_res_dir(res_dir: str, path_fragment: str) -> str:
     return str(Path(res_dir) / path_fragment)
 
 
-def build_bwa_files(sample_entry: Mapping[str, Any], res_dir: str) -> dict[str, str]:
+def build_bwa_file_names(sample_entry: Mapping[str, Any], res_dir: str) -> dict[str, str]:
     """Build all reference index paths needed by BWA and samtools."""
 
     hash_value = str(sample_entry["reference_hash"])
@@ -168,11 +168,3 @@ def build_bwa_files(sample_entry: Mapping[str, Any], res_dir: str) -> dict[str, 
         "ref_pac": f"{ref}.pac",
         "ref_sa": f"{ref}.sa",
     }
-
-
-def masked_reference_fasta(sample_entry: Mapping[str, Any], res_dir: str) -> str:
-    """Return the masked/unmasked reference path for a sample."""
-
-    hash_value = str(sample_entry["reference_hash"])
-    ref_type = "masked" if sample_entry["bed"] else "unmasked"
-    return append_res_dir(res_dir, f"references/{hash_value}/{hash_value}.{ref_type}.fasta")
