@@ -499,7 +499,7 @@ rule profile_with_respro:
     input:
         bam=_append_res_dir("{sample}/{sample}.bam"),
         bai=_append_res_dir("{sample}/{sample}.bam.bai"),
-        ref=_masked_reference_fasta,
+        ref=_get_indexed_reference_fasta,
         vcf=_append_res_dir("{sample}/{sample}.vcf"),
         respro_db=_respro_db_file
     output:
