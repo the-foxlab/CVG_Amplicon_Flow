@@ -448,7 +448,10 @@ def _snpsift_fields():
     return " ".join(f"'{field}'" for field in fields)
 
 
-rule snpsift_extract_fields:
+rule snpsift_extract_fields:#
+    """
+    Extract fields from VCF file and output tabular data.
+    """
     input:
         vcf=_append_res_dir("{sample}/{sample}.vcf"),
     output:
@@ -466,13 +469,18 @@ rule snpsift_extract_fields:
 
 
 def _amplicon_bed(wildcards):
-    """Path of the derived amplicon BED, only when a primer BED is configured."""
+    """
+    Path of the derived amplicon BED, only when a primer BED is configured.
+    """
     if SAMPLES_MAP[wildcards.sample]["bed"]:
         return _append_res_dir(f"{wildcards.sample}/{wildcards.sample}.amplicons.bed")
     return []
 
 
 rule primers_to_amplicons:
+    """
+    Create a new temporary BED file with the amplicon regions derived from the primer BED file.
+    """
     input:
         bed=lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
     output:
@@ -492,6 +500,9 @@ rule primers_to_amplicons:
 
 
 rule visualize_bam_bamdash:
+    """
+    Visualize the BAM file with bamdash, optionally adding the amplicon BED as a track.
+    """
     input:
         bam=_append_res_dir("{sample}/{sample}.bam"),
         bai=_append_res_dir("{sample}/{sample}.bam.bai"),
@@ -520,9 +531,9 @@ rule visualize_bam_bamdash:
 
 rule create_run_report_and_cleanup:
     """
-    Create a summary report for all samples and clean up temporary files --> mainly bamdash files that calculate some stats. Before
-    deleting the bamdash report, it is copied to the sample directory from .bamdash as bamdash can iterate over CHROM dereby creating
-    multiple plots and files - one per CHROM each.
+    Create a summary report for all samples and clean up temporary files - mainly bamdash files that calculate 
+    some stats. Before deleting the bamdash report, it is copied to the sample directory from .bamdash as 
+    bamdash can iterate over CHROM dereby creating multiple plots and files - one per CHROM each.
     """
     input:
         bamdash_html=[_append_res_dir(f"{sample}/.bamdash/{sample}_plot.html") for sample in SAMPLES],
@@ -548,7 +559,8 @@ rule create_run_report_and_cleanup:
 
 rule profile_with_respro:
     """
-    Optionally profile the sequencing
+    Optionally profile the sequencing result with ResistanceProfiler and a preloaded database.
+    Creates automatic phenotyping results.
     """
     input:
         bam=_append_res_dir("{sample}/{sample}.bam"),
