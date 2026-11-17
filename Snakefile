@@ -48,8 +48,8 @@ rule all:
         [_append_res_dir(f"{sample}/{sample}.bam") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.consensus.fasta") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.vcf") for sample in SAMPLES],
-        [_append_res_dir(f"{sample}/{sample}.respro.html") for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")]
-
+        [_append_res_dir(f"{sample}/{sample}.respro.html") for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")],
+        [_append_res_dir(f"{sample}/{sample}_variants.tsv") for sample in SAMPLES],
 
 def _get_masking_input(wildcards):
     [fasta_fn, bed_fn] = HASH_to_files[wildcards.hash_value]
@@ -436,6 +436,29 @@ rule merge_vcfs_together:
     shell:
         """
         bcftools concat --output-type v -o {output.merged_vcfs:q} {input.vcfs:q} > {log.stdout:q} 2> {log.stderr:q};
+        """
+
+
+def _snpsift_fields():
+    """Quoted SnpSift extractFields column list from config."""
+    fields = config.get("snpsift_extract_fields", ["CHROM", "POS", "REF", "ALT", "FILTER", "DP", "AF"])
+    return " ".join(f"'{field}'" for field in fields)
+
+
+rule snpsift_extract_fields:
+    input:
+        vcf=_append_res_dir("{sample}/{sample}.vcf"),
+    output:
+        tsv=_append_res_dir("{sample}/{sample}_variants.tsv")
+    params:
+        fields=_snpsift_fields(),
+    conda:
+        "requirements/requirements_snpsift.yaml"
+    log:
+        stderr="logs/{sample}/snpsift_extract_fields.stderr.log"
+    shell:
+        """
+        SnpSift extractFields {input.vcf:q} {params.fields} > {output.tsv:q} 2> {log.stderr:q};
         """
 
 

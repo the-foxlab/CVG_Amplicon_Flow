@@ -57,6 +57,9 @@ bcftools_normalize_check_ref: "w"
 bcftools_normalize_site_win: 1000
 bcftools_normalize_sort: "pos"
 
+# SnpSift extractFields parameters
+snpsift_extract_fields: ["CHROM", "POS", "REF", "ALT", "FILTER", "DP", "AF"]
+
 # bamdash parameters
 bamdash_bs: 10
 bamdash_coverage: 10
