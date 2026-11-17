@@ -63,7 +63,7 @@ snpsift_extract_fields: ["CHROM", "POS", "REF", "ALT", "FILTER", "DP", "AF"]
 # bamdash parameters
 bamdash_bs: 10
 bamdash_coverage: 10
-bamdash_mapping_quality: 30
+bamdash_quality: 30
 bamdash_static: True
 bamdash_offline: False
 

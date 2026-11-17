@@ -1,0 +1,63 @@
+{% macro table(headers, rows, empty_message) %}
+  {% if rows %}
+  <div class="table-scroll"><table>
+    <thead><tr>{% for header in headers %}<th scope="col">{{ header }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for row in rows %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">{{ empty_message }}</p>{% endif %}
+{% endmacro %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Run summary</title>
+  <style>{% include 'report.css' %}</style>
+</head>
+<body><main>
+  <header>
+    <div class="eyebrow">Illumina sequencing · run report</div>
+    <h1>Aggregated results</h1>
+    <p class="intro">Coverage metrics and sample-level reports including coverage plots, amplicon stats and variants.</p>
+  </header>
+  <section>
+    <h2>Coverage summary</h2>
+    {{ table(['Sample', 'Reference', 'Mapped reads', 'Mean coverage', recovery_key.replace('% recovery', 'Recovery').replace('x', '×')], summary, 'No coverage metrics available.') }}
+  </section>
+  {% if samples|length > 1 %}
+  <div class="sample-select">
+    <label for="select-sample">Select sample for specific results</label>
+    <select id="select-sample" data-sample-select>
+      {% for sample in samples %}<option value="{{ sample }}">{{ sample }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% if coverage %}
+  <section><h2>BAMdash coverage plots</h2>
+    {% for item in coverage %}<div class="sample-panel" data-sample="{{ item.sample }}"><div class="plot-grid">
+      {% for plot in item.plots %}<figure class="plot"><figcaption>{{ plot.reference }}</figcaption>
+        <img src="data:image/svg+xml;base64,{{ plot.image }}" alt="Coverage plot for {{ plot.reference }}">
+      </figure>{% endfor %}
+    </div></div>{% endfor %}
+  </section>
+  {% endif %}
+  {% if amplicons %}
+  <section><h2>Amplicon recovery</h2>
+    {% for item in amplicons %}<div class="sample-panel" data-sample="{{ item.sample }}">
+      {% for result in item.tables %}<section class="reference-detail"><h4>{{ result.reference }}</h4>
+        {{ table(result.headers, result.rows, 'No amplicon recovery data available.') }}
+      </section>{% endfor %}
+    </div>{% endfor %}
+  </section>
+  {% endif %}
+  {% if variants %}
+  <section><h2>Called variants</h2>
+    {% for item in variants %}<div class="sample-panel" data-sample="{{ item.sample }}">
+      <section class="reference-detail"><h4>{{ item.sample }} variants</h4>
+        {{ table(item.headers, item.rows, 'No variants reported for this sample.') }}
+      </section>
+    </div>{% endfor %}
+  </section>
+  {% endif %}
+</main><script>{% include 'report.js' %}</script></body>
+</html>

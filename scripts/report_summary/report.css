@@ -1,0 +1,208 @@
+/* Run summary report styles.
+ *
+ * This file is inlined into the generated report by report.html.j2, so it must
+ * stay dependency-free: no external fonts, imports or url() references.
+ *
+ * Order: variables & base, layout, header, tables, plots, sample selectors,
+ * small-screen behaviour.
+ */
+
+/* --- Design tokens ------------------------------------------------------ */
+
+:root {
+	color-scheme: light;
+	--ink: #17211f;      /* primary text */
+	--muted: #64716e;    /* secondary text and labels */
+	--line: #dce4e0;     /* hairline borders */
+	--paper: #f4f7f4;    /* page background */
+	--accent: #176b56;   /* eyebrow and highlights */
+}
+
+/* --- Base --------------------------------------------------------------- */
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+}
+
+/* --- Page layout -------------------------------------------------------- */
+
+main {
+	width: min(1180px, calc(100% - 40px));
+	margin: 48px auto 80px;
+}
+
+section {
+	margin: 36px 0;
+}
+
+h2 {
+	margin: 0 0 14px;
+	font-size: 20px;
+	letter-spacing: -.02em;
+}
+
+.intro {
+	color: var(--muted);
+	margin: 0;
+}
+
+.empty {
+	color: var(--muted);
+	padding: 12px;
+}
+
+/* --- Header ------------------------------------------------------------- */
+
+header {
+	border-bottom: 1px solid var(--line);
+	padding: 0 0 28px;
+	margin-bottom: 34px;
+}
+
+.eyebrow {
+	color: var(--accent);
+	font: 700 11px/1.4 ui-monospace, monospace;
+	letter-spacing: .13em;
+	text-transform: uppercase;
+}
+
+h1 {
+	margin: 8px 0;
+	font-size: clamp(28px, 4vw, 42px);
+	letter-spacing: -.04em;
+	line-height: 1.1;
+}
+
+/* --- Tables ------------------------------------------------------------- */
+
+/* Scroll horizontally on narrow screens instead of squashing columns. */
+.table-scroll {
+	overflow-x: auto;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: white;
+}
+
+table {
+	border-collapse: collapse;
+	width: 100%;
+	min-width: 520px;
+	text-align: left;
+}
+
+th,
+td {
+	padding: 11px 14px;
+	border-bottom: 1px solid var(--line);
+}
+
+th {
+	color: var(--muted);
+	background: #f8faf8;
+	font-size: 12px;
+	font-weight: 650;
+}
+
+tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+/* Metric columns use monospaced, tabular numerals for aligned comparison. */
+td:nth-child(n+3) {
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	font-variant-numeric: tabular-nums;
+}
+
+/* --- Coverage plots ----------------------------------------------------- */
+
+/* Two-column grid; collapses to one column on narrow screens (see below). */
+.plot-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.plot {
+	margin: 0;
+	min-width: 0;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	overflow: hidden;
+	background: white;
+}
+
+.plot figcaption {
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--line);
+	color: var(--muted);
+	font: 600 12px ui-monospace, monospace;
+}
+
+.plot img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+/* --- Per-reference detail blocks (variants, amplicon recovery) ---------- */
+
+.reference-detail {
+	margin: 14px 0;
+}
+
+.reference-detail h4 {
+	margin: 0 0 8px;
+	color: var(--muted);
+	font: 650 12px ui-monospace, monospace;
+}
+
+/* --- Sample selectors --------------------------------------------------- */
+
+.sample-select {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 16px;
+}
+
+.sample-select label {
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+select {
+	min-width: 220px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: white;
+	color: var(--ink);
+	padding: 9px 34px 9px 11px;
+	font: inherit;
+}
+
+/* report.js hides non-selected sample panels via the hidden attribute. */
+.sample-panel[hidden] {
+	display: none;
+}
+
+/* --- Small screens ------------------------------------------------------ */
+
+@media (max-width: 720px) {
+	main {
+		width: min(100% - 28px, 1180px);
+		margin-top: 26px;
+	}
+
+	.plot-grid {
+		grid-template-columns: 1fr;
+	}
+}

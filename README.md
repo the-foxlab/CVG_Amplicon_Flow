@@ -14,6 +14,7 @@ The primary goal is to offer a simple, automated pipeline for generating **conse
   * Consensus genomes (`.fasta`)
   * Called variants (`.vcf`)
   * Interactive alignment visualizations via [BAMdash](https://github.com/jonas-fuchs/BAMdash).
+  * An aggregate HTML report with sample/reference coverage, variants and amplicon recovery.
   * Resistance genotyping with ResistanceProfiler
 
 ## Current pipeline behavior
@@ -77,6 +78,7 @@ All outputs are written under `res_dir` from `config.yaml`.
 
 ```
 <res_dir>/
+  report_summary.html
   references/
     <reference_hash>/
       <reference_hash>.masked.fasta or <reference_hash>.unmasked.fasta

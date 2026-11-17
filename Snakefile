@@ -1,11 +1,13 @@
 configfile: "config.yaml"
 
 from pathlib import Path
+import shutil
 import sys
 
 sys.path.insert(0, str(Path(workflow.basedir) / "scripts"))
 
 from snakefile_helpers import append_res_dir, build_bwa_file_names, load_samples 
+from report_summary import render_report
 
 
 def _all_bwa_files(wildcards):
@@ -50,6 +52,7 @@ rule all:
         [_append_res_dir(f"{sample}/{sample}.vcf") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.respro.html") for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")],
         [_append_res_dir(f"{sample}/{sample}_variants.tsv") for sample in SAMPLES],
+        _append_res_dir("report_summary.html"),
 
 def _get_masking_input(wildcards):
     [fasta_fn, bed_fn] = HASH_to_files[wildcards.hash_value]
@@ -483,8 +486,8 @@ rule primers_to_amplicons:
         "requirements/requirements_primers_to_amplicons.yaml"
     shell:
         """
-        python {params.script} {input.bed} {output.bed} \
-            > {log.stdout} 2> {log.stderr}
+        python {params.script:q} {input.bed:q} {output.bed:q} \
+            > {log.stdout:q} 2> {log.stderr:q}
         """
 
 
@@ -495,24 +498,52 @@ rule visualize_bam_bamdash:
         vcf=_append_res_dir("{sample}/{sample}.vcf"),
         amplicon_bed=_amplicon_bed,
     output:
-        html=_append_res_dir("{sample}/{sample}_plot.html"),
+        html=temp(_append_res_dir("{sample}/.bamdash/{sample}_plot.html")),
     log:
         stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stderr.log")
     params:
-        prefix = _append_res_dir("{sample}/{sample}_plot"),
+        prefix = _append_res_dir("{sample}/.bamdash/{sample}_plot"),
         bs = config.get("bamdash_bs", 10),
         coverage = config.get("bamdash_coverage", 10),
-        mapping_quality = config.get("bamdash_mapping_quality", 30),
+        quality = config.get("bamdash_quality", 30),
         filetype = "html svg" if config.get("bamdash_static", True) else "html",
         offline = "--offline" if config.get("bamdash_offline", True) else "--no-offline",
-        add_track = lambda wildcards: f"{SAMPLES_MAP[wildcards.sample]['bed']} {_amplicon_bed(wildcards)}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
+        add_track = lambda wildcards: [SAMPLES_MAP[wildcards.sample]["bed"], _amplicon_bed(wildcards)] if SAMPLES_MAP[wildcards.sample]["bed"] else []
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track} {params.offline} --dump > {log.stdout:q} 2> {log.stderr:q};
+        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track:q} {params.offline} --dump > {log.stdout:q} 2> {log.stderr:q};
         """
+
+
+rule create_run_report_and_cleanup:
+    """
+    Create a summary report for all samples and clean up temporary files --> mainly bamdash files that calculate some stats. Before
+    deleting the bamdash report, it is copied to the sample directory from .bamdash as bamdash can iterate over CHROM dereby creating
+    multiple plots and files - one per CHROM each.
+    """
+    input:
+        bamdash_html=[_append_res_dir(f"{sample}/.bamdash/{sample}_plot.html") for sample in SAMPLES],
+        variants=[_append_res_dir(f"{sample}/{sample}_variants.tsv") for sample in SAMPLES],
+    output:
+        html=_append_res_dir("report_summary.html"),
+        moved_bamdash_html=[_append_res_dir(f"{sample}/{sample}_plot.html") for sample in SAMPLES],
+    run:
+        render_report(
+            {sample: Path(path).parent for sample, path in zip(SAMPLES, input.bamdash_html)},  # get the .bamdash directory
+            {sample: Path(path) for sample, path in zip(SAMPLES, input.variants)},
+            {sample: SAMPLES_MAP[sample]["references"] for sample in SAMPLES},
+            config.get("bamdash_static", True),
+            Path(output.html),
+        )
+        for sample, staged_html, moved in zip(SAMPLES, input.bamdash_html, output.moved_bamdash_html):
+            shutil.copyfile(staged_html, moved)
+        # BAMdash writes all sidecars next to the staged HTML inside .bamdash,
+        # so removing that directory clears every temporary file in one go.
+        for staged_html in input.bamdash_html:
+            shutil.rmtree(Path(staged_html).parent)
 
 
 rule profile_with_respro:
