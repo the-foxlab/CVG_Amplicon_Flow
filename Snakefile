@@ -448,7 +448,7 @@ def _snpsift_fields():
     return " ".join(f"'{field}'" for field in fields)
 
 
-rule snpsift_extract_fields:#
+rule snpsift_extract_fields:
     """
     Extract fields from VCF file and output tabular data.
     """
