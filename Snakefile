@@ -511,7 +511,7 @@ rule visualize_bam_bamdash:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track} {params.offline} > {log.stdout:q} 2> {log.stderr:q};
+        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track} {params.offline} --dump > {log.stdout:q} 2> {log.stderr:q};
         """
 
 
