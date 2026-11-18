@@ -8,17 +8,13 @@ STATS = "mapped\t181\nmean coverage\t12\n% recovery >= 10x\t97\n"
 BED = "start\tstop\tname\tmean coverage\t% recovery >= 10x\n1\t9\tamp_1\t5\t80\n"
 
 
-def _write_inputs(root: Path, *, with_svg: bool = False, with_bed: bool = False) -> Path:
-	stage = root / "sample" / ".bamdash"
+def _write_sample(root: Path, name: str = "sample") -> tuple[Path, Path]:
+	stage = root / name / ".bamdash"
 	stage.mkdir(parents=True)
-	(stage / "sample_plot_ref_bam_stats.tabular").write_text(STATS)
-	if with_svg:
-		(stage / "sample_plot_ref.svg").write_text("<svg></svg>")
-	if with_bed:
-		(stage / "sample_plot_ref_bed_data_1.tabular").write_text(BED)
-	variants = root / "sample_variants.tsv"
+	(stage / f"{name}_plot_ref_bam_stats.tabular").write_text(STATS)
+	variants = root / f"{name}_variants.tsv"
 	variants.write_text("CHROM\tPOS\nref\t42\n")
-	return variants
+	return stage, variants
 
 
 def test_parses_stats_and_tsv(tmp_path: Path) -> None:
@@ -37,22 +33,29 @@ def test_parses_stats_and_tsv(tmp_path: Path) -> None:
 
 def test_report_includes_and_excludes_sections(tmp_path: Path) -> None:
 	output = tmp_path / "report_summary.html"
-	variants = _write_inputs(tmp_path)
-	stage = tmp_path / "sample" / ".bamdash"
+	stage, variants = _write_sample(tmp_path)
 
-	# Optional inputs absent -> their sections are excluded, nothing breaks.
 	render_report({"sample": stage}, {"sample": variants}, {"sample": ["ref"]}, True, output)
 	content = output.read_text()
 	assert "181" in content and "97" in content and "42" in content
 	assert "Coverage summary" in content and "Called variants" in content
+	assert "select-sample" not in content
 	assert "data:image/svg+xml;base64," not in content
 	assert "amp_1" not in content
 
-	# Optional inputs present -> their sections are included.
 	(stage / "sample_plot_ref.svg").write_text("<svg></svg>")
 	(stage / "sample_plot_ref_bed_data_1.tabular").write_text(BED)
-	render_report({"sample": stage}, {"sample": variants}, {"sample": ["ref"]}, True, output)
+	stage2, variants2 = _write_sample(tmp_path, "sample_2")
+	render_report(
+		{"sample": stage, "sample_2": stage2},
+		{"sample": variants, "sample_2": variants2},
+		{"sample": ["ref"], "sample_2": ["ref"]},
+		True,
+		output,
+	)
 	content = output.read_text()
+	assert "select-sample" in content
+	assert 'data-sample="sample_2" hidden' in content
 	assert "data:image/svg+xml;base64," in content
 	assert "amp_1" in content
-	assert "data:image/svg+xml;base64," in content
+	assert content.count("Amplicon recovery") == 1

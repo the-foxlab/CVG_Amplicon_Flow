@@ -1,11 +1,11 @@
-{% macro table(headers, rows, empty_message) %}
+{% macro table(headers, rows, empty_message='No entries.') -%}
   {% if rows %}
   <div class="table-scroll"><table>
     <thead><tr>{% for header in headers %}<th scope="col">{{ header }}</th>{% endfor %}</tr></thead>
     <tbody>{% for row in rows %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</tbody>
   </table></div>
   {% else %}<p class="empty">{{ empty_message }}</p>{% endif %}
-{% endmacro %}
+{%- endmacro %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -18,46 +18,62 @@
   <header>
     <div class="eyebrow">Illumina sequencing · run report</div>
     <h1>Aggregated results</h1>
-    <p class="intro">Coverage metrics and sample-level reports including coverage plots, amplicon stats and variants.</p>
+    <p>Coverage metrics and sample-level reports including coverage plots, amplicon stats and variants.</p>
   </header>
   <section>
     <h2>Coverage summary</h2>
-    {{ table(['Sample', 'Reference', 'Mapped reads', 'Mean coverage', recovery_key.replace('% recovery', 'Recovery').replace('x', '×')], summary, 'No coverage metrics available.') }}
+    {{ table(['Sample', 'Reference', 'Mapped reads', 'Mean coverage', recovery_key], summary) }}
   </section>
   {% if samples|length > 1 %}
   <div class="sample-select">
     <label for="select-sample">Select sample for specific results</label>
-    <select id="select-sample" data-sample-select>
-      {% for sample in samples %}<option value="{{ sample }}">{{ sample }}</option>{% endfor %}
+    <select id="select-sample">
+      {% for sample in samples %}<option value="{{ sample.name }}">{{ sample.name }}</option>{% endfor %}
     </select>
   </div>
   {% endif %}
-  {% if coverage %}
-  <section><h2>BAMdash coverage plots</h2>
-    {% for item in coverage %}<div class="sample-panel" data-sample="{{ item.sample }}"><div class="plot-grid">
-      {% for plot in item.plots %}<figure class="plot"><figcaption>{{ plot.reference }}</figcaption>
-        <img src="data:image/svg+xml;base64,{{ plot.image }}" alt="Coverage plot for {{ plot.reference }}">
-      </figure>{% endfor %}
-    </div></div>{% endfor %}
-  </section>
-  {% endif %}
-  {% if amplicons %}
-  <section><h2>Amplicon recovery</h2>
-    {% for item in amplicons %}<div class="sample-panel" data-sample="{{ item.sample }}">
-      {% for result in item.tables %}<section class="reference-detail"><h4>{{ result.reference }}</h4>
-        {{ table(result.headers, result.rows, 'No amplicon recovery data available.') }}
-      </section>{% endfor %}
-    </div>{% endfor %}
-  </section>
-  {% endif %}
-  {% if variants %}
-  <section><h2>Called variants</h2>
-    {% for item in variants %}<div class="sample-panel" data-sample="{{ item.sample }}">
-      <section class="reference-detail"><h4>{{ item.sample }} variants</h4>
-        {{ table(item.headers, item.rows, 'No variants reported for this sample.') }}
-      </section>
-    </div>{% endfor %}
-  </section>
-  {% endif %}
-</main><script>{% include 'report.js' %}</script></body>
+  {% for sample in samples %}
+  <div class="sample-panel" data-sample="{{ sample.name }}"{% if not loop.first %} hidden{% endif %}>
+    {% if sample.plots %}
+    <section>
+      <h2>BAMdash coverage plots</h2>
+      <div class="plot-grid">
+        {% for plot in sample.plots %}
+        <figure>
+          <figcaption>{{ plot.reference }}</figcaption>
+          <img src="data:image/svg+xml;base64,{{ plot.image }}" alt="Coverage plot for {{ plot.reference }}">
+        </figure>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+    {% if sample.amplicons %}
+    <section>
+      <h2>Amplicon recovery</h2>
+      {% for item in sample.amplicons %}
+      <h3>{{ item.reference }}</h3>
+      {{ table(item.headers, item.rows) }}
+      {% endfor %}
+    </section>
+    {% endif %}
+    <section>
+      <h2>Called variants</h2>
+      {{ table(sample.variants.headers, sample.variants.rows, 'No variants reported for this sample.') }}
+    </section>
+  </div>
+  {% endfor %}
+</main>
+{% if samples|length > 1 %}
+<script>
+const select = document.getElementById('select-sample');
+const sync = () => {
+  for (const panel of document.querySelectorAll('.sample-panel')) {
+    panel.hidden = panel.dataset.sample !== select.value;
+  }
+};
+select.addEventListener('change', sync);
+sync();
+</script>
+{% endif %}
+</body>
 </html>

@@ -549,11 +549,8 @@ rule create_run_report_and_cleanup:
             config.get("bamdash_static", True),
             Path(output.html),
         )
-        for sample, staged_html, moved in zip(SAMPLES, input.bamdash_html, output.moved_bamdash_html):
-            shutil.copyfile(staged_html, moved)
-        # BAMdash writes all sidecars next to the staged HTML inside .bamdash,
-        # so removing that directory clears every temporary file in one go.
-        for staged_html in input.bamdash_html:
+        for staged_html, moved in zip(input.bamdash_html, output.moved_bamdash_html):
+            shutil.move(staged_html, moved)
             shutil.rmtree(Path(staged_html).parent)
 
 

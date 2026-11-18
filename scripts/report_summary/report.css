@@ -1,24 +1,13 @@
-/* Run summary report styles.
- *
- * This file is inlined into the generated report by report.html.j2, so it must
- * stay dependency-free: no external fonts, imports or url() references.
- *
- * Order: variables & base, layout, header, tables, plots, sample selectors,
- * small-screen behaviour.
- */
-
-/* --- Design tokens ------------------------------------------------------ */
+/* Self-contained run summary styles (inlined into report.html.j2). */
 
 :root {
 	color-scheme: light;
-	--ink: #17211f;      /* primary text */
-	--muted: #64716e;    /* secondary text and labels */
-	--line: #dce4e0;     /* hairline borders */
-	--paper: #f4f7f4;    /* page background */
-	--accent: #176b56;   /* eyebrow and highlights */
+	--ink: #17211f;
+	--muted: #64716e;
+	--line: #dce4e0;
+	--paper: #f4f7f4;
+	--accent: #176b56;
 }
-
-/* --- Base --------------------------------------------------------------- */
 
 * {
 	box-sizing: border-box;
@@ -31,38 +20,15 @@ body {
 	font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
 }
 
-/* --- Page layout -------------------------------------------------------- */
-
 main {
-	width: min(1180px, calc(100% - 40px));
+	max-width: 1180px;
 	margin: 48px auto 80px;
+	padding: 0 20px;
 }
-
-section {
-	margin: 36px 0;
-}
-
-h2 {
-	margin: 0 0 14px;
-	font-size: 20px;
-	letter-spacing: -.02em;
-}
-
-.intro {
-	color: var(--muted);
-	margin: 0;
-}
-
-.empty {
-	color: var(--muted);
-	padding: 12px;
-}
-
-/* --- Header ------------------------------------------------------------- */
 
 header {
 	border-bottom: 1px solid var(--line);
-	padding: 0 0 28px;
+	padding-bottom: 28px;
 	margin-bottom: 34px;
 }
 
@@ -80,9 +46,33 @@ h1 {
 	line-height: 1.1;
 }
 
-/* --- Tables ------------------------------------------------------------- */
+header p {
+	color: var(--muted);
+	margin: 0;
+}
 
-/* Scroll horizontally on narrow screens instead of squashing columns. */
+.empty {
+	color: var(--muted);
+	padding: 12px 0;
+	margin: 0;
+}
+
+section {
+	margin: 36px 0;
+}
+
+h2 {
+	margin: 0 0 14px;
+	font-size: 20px;
+	letter-spacing: -.02em;
+}
+
+h3 {
+	margin: 14px 0 8px;
+	color: var(--muted);
+	font: 600 12px ui-monospace, monospace;
+}
+
 .table-scroll {
 	overflow-x: auto;
 	border: 1px solid var(--line);
@@ -95,6 +85,7 @@ table {
 	width: 100%;
 	min-width: 520px;
 	text-align: left;
+	font-variant-numeric: tabular-nums;
 }
 
 th,
@@ -107,29 +98,20 @@ th {
 	color: var(--muted);
 	background: #f8faf8;
 	font-size: 12px;
-	font-weight: 650;
+	font-weight: 600;
 }
 
 tbody tr:last-child td {
 	border-bottom: 0;
 }
 
-/* Metric columns use monospaced, tabular numerals for aligned comparison. */
-td:nth-child(n+3) {
-	font-family: ui-monospace, SFMono-Regular, monospace;
-	font-variant-numeric: tabular-nums;
-}
-
-/* --- Coverage plots ----------------------------------------------------- */
-
-/* Two-column grid; collapses to one column on narrow screens (see below). */
 .plot-grid {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 16px;
 }
 
-.plot {
+figure {
 	margin: 0;
 	min-width: 0;
 	border: 1px solid var(--line);
@@ -138,39 +120,25 @@ td:nth-child(n+3) {
 	background: white;
 }
 
-.plot figcaption {
+figcaption {
 	padding: 10px 14px;
 	border-bottom: 1px solid var(--line);
 	color: var(--muted);
 	font: 600 12px ui-monospace, monospace;
 }
 
-.plot img {
+figure img {
 	display: block;
 	width: 100%;
 	height: auto;
 }
-
-/* --- Per-reference detail blocks (variants, amplicon recovery) ---------- */
-
-.reference-detail {
-	margin: 14px 0;
-}
-
-.reference-detail h4 {
-	margin: 0 0 8px;
-	color: var(--muted);
-	font: 650 12px ui-monospace, monospace;
-}
-
-/* --- Sample selectors --------------------------------------------------- */
 
 .sample-select {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 10px;
-	margin: 0 0 16px;
+	margin-bottom: 16px;
 }
 
 .sample-select label {
@@ -185,20 +153,12 @@ select {
 	border-radius: 8px;
 	background: white;
 	color: var(--ink);
-	padding: 9px 34px 9px 11px;
+	padding: 8px 12px;
 	font: inherit;
 }
 
-/* report.js hides non-selected sample panels via the hidden attribute. */
-.sample-panel[hidden] {
-	display: none;
-}
-
-/* --- Small screens ------------------------------------------------------ */
-
 @media (max-width: 720px) {
 	main {
-		width: min(100% - 28px, 1180px);
 		margin-top: 26px;
 	}
 
