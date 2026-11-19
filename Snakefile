@@ -1,13 +1,12 @@
 configfile: "config.yaml"
 
 from pathlib import Path
-import shutil
+import json
 import sys
 
 sys.path.insert(0, str(Path(workflow.basedir) / "scripts"))
 
-from snakefile_helpers import append_res_dir, build_bwa_file_names, load_samples 
-from report_summary import render_report
+from snakefile_helpers import append_res_dir, build_bwa_file_names, load_samples
 
 
 def _all_bwa_files(wildcards):
@@ -509,12 +508,13 @@ rule visualize_bam_bamdash:
         vcf=_append_res_dir("{sample}/{sample}.vcf"),
         amplicon_bed=_amplicon_bed,
     output:
-        html=temp(_append_res_dir("{sample}/.bamdash/{sample}_plot.html")),
+        bamdash_dir=temp(directory(_append_res_dir("{sample}/.bamdash"))),
+        html=_append_res_dir("{sample}/{sample}_plot.html"),
     log:
         stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stderr.log")
     params:
-        prefix = _append_res_dir("{sample}/.bamdash/{sample}_plot"),
+        prefix = lambda wildcards, output: f"{output.bamdash_dir}/{wildcards.sample}_plot",
         bs = config.get("bamdash_bs", 10),
         coverage = config.get("bamdash_coverage", 10),
         quality = config.get("bamdash_quality", 30),
@@ -525,33 +525,46 @@ rule visualize_bam_bamdash:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track:q} {params.offline} --dump > {log.stdout:q} 2> {log.stderr:q};
+        mkdir -p {output.bamdash_dir:q}
+        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track:q} {params.offline} --dump > {log.stdout:q} 2> {log.stderr:q}
+        cp {params.prefix:q}.html {output.html:q}
         """
 
 
-rule create_run_report_and_cleanup:
+rule create_run_report:
     """
-    Create a summary report for all samples and clean up temporary files - mainly bamdash files that calculate 
-    some stats. Before deleting the bamdash report, it is copied to the sample directory from .bamdash as 
-    bamdash can iterate over CHROM dereby creating multiple plots and files - one per CHROM each.
+    Create an aggregated summary report for all samples from BAMdash sidecars and variant tables.
     """
     input:
-        bamdash_html=[_append_res_dir(f"{sample}/.bamdash/{sample}_plot.html") for sample in SAMPLES],
-        variants=[_append_res_dir(f"{sample}/{sample}_variants.tsv") for sample in SAMPLES],
+        bamdash_dirs=collect(_append_res_dir("{sample}/.bamdash"), sample=SAMPLES),
+        variants=collect(_append_res_dir("{sample}/{sample}_variants.tsv"), sample=SAMPLES),
     output:
         html=_append_res_dir("report_summary.html"),
-        moved_bamdash_html=[_append_res_dir(f"{sample}/{sample}_plot.html") for sample in SAMPLES],
-    run:
-        render_report(
-            {sample: Path(path).parent for sample, path in zip(SAMPLES, input.bamdash_html)},  # get the .bamdash directory
-            {sample: Path(path) for sample, path in zip(SAMPLES, input.variants)},
-            {sample: SAMPLES_MAP[sample]["references"] for sample in SAMPLES},
-            config.get("bamdash_static", True),
-            Path(output.html),
-        )
-        for staged_html, moved in zip(input.bamdash_html, output.moved_bamdash_html):
-            shutil.move(staged_html, moved)
-            shutil.rmtree(Path(staged_html).parent)
+        bamdash_dirs_txt=temp(_append_res_dir("bamdash_dirs.txt")),
+        references_txt=temp(_append_res_dir("references.txt")),
+        variants_txt=temp(_append_res_dir("variants.txt")),
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/create_run_report.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/create_run_report.stderr.log"),
+    params:
+        references=lambda wildcards: json.dumps({sample: SAMPLES_MAP[sample]["references"] for sample in SAMPLES}),
+        svg="--svg" if config.get("bamdash_static", True) else "--no-svg",
+        script=str(Path(workflow.basedir) / "scripts/report_summary.py")
+    conda:
+        "requirements/requirements_report.yaml"
+    shell:
+        """
+        printf '%s\\n' {input.bamdash_dirs:q} > {output.bamdash_dirs_txt:q}
+        printf '%s\\n' {params.references:q} > {output.references_txt:q}
+        printf '%s\\n' {input.variants:q} > {output.variants_txt:q}
+        python {params.script} \
+            --bamdash-dirs {output.bamdash_dirs_txt:q} \
+            --variants {output.variants_txt:q} \
+            --references {output.references_txt:q} \
+            {params.svg} \
+            --output {output.html:q} \
+            > {log.stdout:q} 2> {log.stderr:q}
+        """
 
 
 rule profile_with_respro:

@@ -1,8 +1,9 @@
 """Minimal tests for the run summary report: parsing and section selection."""
 
+import json
 from pathlib import Path
 
-from scripts.report_summary import load_stats, read_tsv, render_report
+from scripts.report_summary import load_stats, main, read_tsv, render_report
 
 STATS = "mapped\t181\nmean coverage\t12\n% recovery >= 10x\t97\n"
 BED = "start\tstop\tname\tmean coverage\t% recovery >= 10x\n1\t9\tamp_1\t5\t80\n"
@@ -59,3 +60,27 @@ def test_report_includes_and_excludes_sections(tmp_path: Path) -> None:
 	assert "data:image/svg+xml;base64," in content
 	assert "amp_1" in content
 	assert content.count("Amplicon recovery") == 1
+
+
+def test_cli_main_renders_report(tmp_path: Path) -> None:
+	output = tmp_path / "cli_report.html"
+	stage, variants = _write_sample(tmp_path)
+	(stage / "sample_plot_ref.svg").write_text("<svg></svg>")
+
+	bamdash_txt = tmp_path / "bamdash_dirs.txt"
+	variants_txt = tmp_path / "variants.txt"
+	references_txt = tmp_path / "references.txt"
+	bamdash_txt.write_text(f"{stage}\n")
+	variants_txt.write_text(f"{variants}\n")
+	references_txt.write_text(json.dumps({"sample": ["ref"]}))
+
+	main([
+		"--bamdash-dirs", str(bamdash_txt),
+		"--variants", str(variants_txt),
+		"--references", str(references_txt),
+		"--no-svg",
+		"--output", str(output),
+	])
+	content = output.read_text()
+	assert "181" in content and "42" in content
+	assert "data:image/svg+xml;base64," not in content

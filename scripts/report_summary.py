@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
 """Prepare and render the self-contained run summary report."""
 
 from __future__ import annotations
 
+import argparse
 import base64
 import csv
+import json
 import re
 from pathlib import Path
 
@@ -106,3 +109,33 @@ def render_report(
 		samples=samples,
 	)
 	output_path.write_text(document, encoding="utf-8")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+	parser = argparse.ArgumentParser(description=__doc__)
+	parser.add_argument("--bamdash-dirs", type=Path, required=True)
+	parser.add_argument("--variants", type=Path, required=True)
+	parser.add_argument("--references", type=Path, required=True)
+	parser.add_argument("--svg", action=argparse.BooleanOptionalAction, default=True)
+	parser.add_argument("-o", "--output", type=Path, required=True)
+	return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+	args = parse_args(argv)
+	bamdash_paths = [Path(line) for line in args.bamdash_dirs.read_text(encoding="utf-8").splitlines()]
+	variant_paths = [Path(line) for line in args.variants.read_text(encoding="utf-8").splitlines()]
+	references = json.loads(args.references.read_text(encoding="utf-8"))
+	samples = list(references)
+
+	render_report(
+		dict(zip(samples, bamdash_paths, strict=True)),
+		dict(zip(samples, variant_paths, strict=True)),
+		references,
+		args.svg,
+		args.output,
+	)
+
+
+if __name__ == "__main__":
+	main()
