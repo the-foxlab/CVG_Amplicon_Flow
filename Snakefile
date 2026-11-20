@@ -1,11 +1,12 @@
 configfile: "config.yaml"
 
 from pathlib import Path
+import json
 import sys
 
 sys.path.insert(0, str(Path(workflow.basedir) / "scripts"))
 
-from snakefile_helpers import append_res_dir, build_bwa_file_names, load_samples 
+from snakefile_helpers import append_res_dir, build_bwa_file_names, load_samples
 
 
 def _all_bwa_files(wildcards):
@@ -48,8 +49,9 @@ rule all:
         [_append_res_dir(f"{sample}/{sample}.bam") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.consensus.fasta") for sample in SAMPLES],
         [_append_res_dir(f"{sample}/{sample}.vcf") for sample in SAMPLES],
-        [_append_res_dir(f"{sample}/{sample}.respro.html") for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")]
-
+        [_append_res_dir(f"{sample}/{sample}.respro.html") for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")],
+        [_append_res_dir(f"{sample}/{sample}_variants.tsv") for sample in SAMPLES],
+        _append_res_dir("report_summary.html"),
 
 def _get_masking_input(wildcards):
     [fasta_fn, bed_fn] = HASH_to_files[wildcards.hash_value]
@@ -439,14 +441,45 @@ rule merge_vcfs_together:
         """
 
 
+def _snpsift_fields():
+    """Quoted SnpSift extractFields column list from config."""
+    fields = config.get("snpsift_extract_fields", ["CHROM", "POS", "REF", "ALT", "FILTER", "DP", "AF"])
+    return " ".join(f"'{field}'" for field in fields)
+
+
+rule snpsift_extract_fields:
+    """
+    Extract fields from VCF file and output tabular data.
+    """
+    input:
+        vcf=_append_res_dir("{sample}/{sample}.vcf"),
+    output:
+        tsv=_append_res_dir("{sample}/{sample}_variants.tsv")
+    params:
+        fields=_snpsift_fields(),
+    conda:
+        "requirements/requirements_snpsift.yaml"
+    log:
+        stderr="logs/{sample}/snpsift_extract_fields.stderr.log"
+    shell:
+        """
+        SnpSift extractFields {input.vcf:q} {params.fields} > {output.tsv:q} 2> {log.stderr:q};
+        """
+
+
 def _amplicon_bed(wildcards):
-    """Path of the derived amplicon BED, only when a primer BED is configured."""
+    """
+    Path of the derived amplicon BED, only when a primer BED is configured.
+    """
     if SAMPLES_MAP[wildcards.sample]["bed"]:
         return _append_res_dir(f"{wildcards.sample}/{wildcards.sample}.amplicons.bed")
     return []
 
 
 rule primers_to_amplicons:
+    """
+    Create a new temporary BED file with the amplicon regions derived from the primer BED file.
+    """
     input:
         bed=lambda wildcards: SAMPLES_MAP[wildcards.sample]["bed"],
     output:
@@ -460,41 +493,84 @@ rule primers_to_amplicons:
         "requirements/requirements_primers_to_amplicons.yaml"
     shell:
         """
-        python {params.script} {input.bed} {output.bed} \
-            > {log.stdout} 2> {log.stderr}
+        python {params.script:q} {input.bed:q} {output.bed:q} \
+            > {log.stdout:q} 2> {log.stderr:q}
         """
 
 
 rule visualize_bam_bamdash:
+    """
+    Visualize the BAM file with bamdash, optionally adding the amplicon BED as a track.
+    """
     input:
         bam=_append_res_dir("{sample}/{sample}.bam"),
         bai=_append_res_dir("{sample}/{sample}.bam.bai"),
         vcf=_append_res_dir("{sample}/{sample}.vcf"),
         amplicon_bed=_amplicon_bed,
     output:
+        bamdash_dir=temp(directory(_append_res_dir("{sample}/.bamdash"))),
         html=_append_res_dir("{sample}/{sample}_plot.html"),
     log:
         stdout=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/{sample}/visualize_bam_bamdash.stderr.log")
     params:
-        prefix = _append_res_dir("{sample}/{sample}_plot"),
+        prefix = lambda wildcards, output: f"{output.bamdash_dir}/{wildcards.sample}_plot",
         bs = config.get("bamdash_bs", 10),
         coverage = config.get("bamdash_coverage", 10),
-        mapping_quality = config.get("bamdash_mapping_quality", 30),
+        quality = config.get("bamdash_quality", 30),
         filetype = "html svg" if config.get("bamdash_static", True) else "html",
         offline = "--offline" if config.get("bamdash_offline", True) else "--no-offline",
-        add_track = lambda wildcards: f"{SAMPLES_MAP[wildcards.sample]['bed']} {_amplicon_bed(wildcards)}" if SAMPLES_MAP[wildcards.sample]["bed"] else ""
+        add_track = lambda wildcards: [SAMPLES_MAP[wildcards.sample]["bed"], _amplicon_bed(wildcards)] if SAMPLES_MAP[wildcards.sample]["bed"] else []
     conda:
         "requirements/requirements_bamdash.yaml"
     shell:
         """
-        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.mapping_quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track} {params.offline} > {log.stdout:q} 2> {log.stderr:q};
+        mkdir -p {output.bamdash_dir:q}
+        bamdash --bam {input.bam:q} -bs {params.bs} -c {params.coverage} -s {params.filetype} -q {params.quality} -p {params.prefix:q} -t {input.vcf:q} {params.add_track:q} {params.offline} --dump > {log.stdout:q} 2> {log.stderr:q}
+        cp {params.prefix:q}.html {output.html:q}
+        """
+
+
+rule create_run_report:
+    """
+    Create an aggregated summary report for all samples from BAMdash sidecars and variant tables.
+    """
+    input:
+        bamdash_dirs=collect(_append_res_dir("{sample}/.bamdash"), sample=SAMPLES),
+        variants=collect(_append_res_dir("{sample}/{sample}_variants.tsv"), sample=SAMPLES),
+    output:
+        html=_append_res_dir("report_summary.html"),
+        bamdash_dirs_txt=temp(_append_res_dir("bamdash_dirs.txt")),
+        references_txt=temp(_append_res_dir("references.txt")),
+        variants_txt=temp(_append_res_dir("variants.txt")),
+    log:
+        stdout=str(Path(workflow.basedir) / "logs/create_run_report.stdout.log"),
+        stderr=str(Path(workflow.basedir) / "logs/create_run_report.stderr.log"),
+    params:
+        references=lambda wildcards: json.dumps({sample: SAMPLES_MAP[sample]["references"] for sample in SAMPLES}),
+        svg="--svg" if config.get("bamdash_static", True) else "--no-svg",
+        script=str(Path(workflow.basedir) / "scripts/report_summary.py")
+    conda:
+        "requirements/requirements_report.yaml"
+    shell:
+        """
+        printf '%s\\n' {input.bamdash_dirs:q} > {output.bamdash_dirs_txt:q}
+        printf '%s\\n' {params.references:q} > {output.references_txt:q}
+        printf '%s\\n' {input.variants:q} > {output.variants_txt:q}
+        python {params.script} \
+            --bamdash-dirs {output.bamdash_dirs_txt:q} \
+            --variants {output.variants_txt:q} \
+            --references {output.references_txt:q} \
+            {params.svg} \
+            --output {output.html:q} \
+            > {log.stdout:q} 2> {log.stderr:q}
         """
 
 
 rule profile_with_respro:
     """
-    Optionally profile the sequencing
+    Optionally profile the sequencing result with ResistanceProfiler and a preloaded database.
+    Creates automatic phenotyping results.
     """
     input:
         bam=_append_res_dir("{sample}/{sample}.bam"),
