@@ -8,6 +8,7 @@ import base64
 import csv
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -105,12 +106,14 @@ def render_report(
 		autoescape=True,
 		undefined=StrictUndefined,
 	)
+	timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 	document = env.get_template("report.html.j2").render(
 		summary=summary,
 		recovery_key=recovery_key,
 		samples=samples,
 		config_yaml=config_yaml.strip() if config_yaml else None,
 		sample_sheet=sample_sheet.strip() if sample_sheet else None,
+		generated_at=timestamp,
 	)
 	output_path.write_text(document, encoding="utf-8")
 

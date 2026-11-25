@@ -36,9 +36,10 @@ def test_report_includes_and_excludes_sections(tmp_path: Path) -> None:
 	output = tmp_path / "report_summary.html"
 	stage, variants = _write_sample(tmp_path)
 
-	render_report({"sample": stage}, {"sample": variants}, {"sample": ["ref"]}, True, output)
+	render_report({"sample": stage}, {"sample": variants}, {"sample": ["ref"]}, True, output, generated_at="2026-11-25 09:20:00 CET")
 	content = output.read_text()
 	assert "181" in content and "97" in content and "42" in content
+	assert "Illumina sequencing · run report · Generated at: 2026-11-25 09:20:00 CET" in content
 	assert "Coverage summary" in content and "Called variants" in content
 	assert "select-sample" not in content
 	assert "data:image/svg+xml;base64," not in content
@@ -96,3 +97,4 @@ def test_cli_main_renders_report(tmp_path: Path) -> None:
 	assert "res_dir: results\nbamdash_coverage: 10\nextra: &#39;&lt;tag&gt;&#39;" in content
 	assert "Sample sheet" in content
 	assert "sample,reference_fasta,r1,r2\nsample,ref.fa,r1.fq,r2.fq" in content
+	assert "Generated at: " in content
