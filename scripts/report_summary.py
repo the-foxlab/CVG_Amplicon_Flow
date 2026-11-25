@@ -57,6 +57,7 @@ def render_report(
 		sample_references: dict[str, list[str]],
 		include_svg: bool,
 		output_path: Path,
+		config_yaml: str | None = None,
 ) -> None:
 	"""Read sample outputs and write a self-contained HTML report."""
 	summary: list[list[str]] = []
@@ -107,6 +108,7 @@ def render_report(
 		summary=summary,
 		recovery_key=recovery_key,
 		samples=samples,
+		config_yaml=config_yaml.strip() if config_yaml else None,
 	)
 	output_path.write_text(document, encoding="utf-8")
 
@@ -116,6 +118,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 	parser.add_argument("--bamdash-dirs", type=Path, required=True)
 	parser.add_argument("--variants", type=Path, required=True)
 	parser.add_argument("--references", type=Path, required=True)
+	parser.add_argument("--config", type=Path, default=None)
 	parser.add_argument("--svg", action=argparse.BooleanOptionalAction, default=True)
 	parser.add_argument("-o", "--output", type=Path, required=True)
 	return parser.parse_args(argv)
@@ -126,6 +129,7 @@ def main(argv: list[str] | None = None) -> None:
 	bamdash_paths = [Path(line) for line in args.bamdash_dirs.read_text(encoding="utf-8").splitlines()]
 	variant_paths = [Path(line) for line in args.variants.read_text(encoding="utf-8").splitlines()]
 	references = json.loads(args.references.read_text(encoding="utf-8"))
+	config_yaml = args.config.read_text(encoding="utf-8") if args.config else None
 	samples = list(references)
 
 	render_report(
@@ -134,6 +138,7 @@ def main(argv: list[str] | None = None) -> None:
 		references,
 		args.svg,
 		args.output,
+		config_yaml=config_yaml,
 	)
 
 

@@ -51,6 +51,27 @@ header p {
 	margin: 0;
 }
 
+.config-block {
+	margin-top: 16px;
+}
+
+.config-block summary {
+	width: fit-content;
+	cursor: pointer;
+	color: var(--accent);
+	font: 600 13px/1.4 ui-sans-serif, system-ui, sans-serif;
+}
+
+.config-block pre {
+	margin: 10px 0 0;
+	padding: 14px 16px;
+	overflow-x: auto;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: white;
+	font: 13px/1.5 ui-monospace, monospace;
+}
+
 .empty {
 	color: var(--muted);
 	padding: 12px 0;

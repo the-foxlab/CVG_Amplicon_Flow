@@ -19,6 +19,12 @@
     <div class="eyebrow">Illumina sequencing · run report</div>
     <h1>Aggregated results</h1>
     <p>Coverage metrics and sample-level reports including coverage plots, amplicon stats and variants.</p>
+    {% if config_yaml %}
+    <details class="config-block">
+      <summary>Run configuration</summary>
+      <pre><code>{{ config_yaml }}</code></pre>
+    </details>
+    {% endif %}
   </header>
   <section>
     <h2>Coverage summary</h2>

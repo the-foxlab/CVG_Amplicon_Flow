@@ -3,6 +3,7 @@ configfile: "config.yaml"
 from pathlib import Path
 import json
 import sys
+import yaml
 
 sys.path.insert(0, str(Path(workflow.basedir) / "scripts"))
 
@@ -543,11 +544,13 @@ rule create_run_report:
         bamdash_dirs_txt=temp(_append_res_dir("bamdash_dirs.txt")),
         references_txt=temp(_append_res_dir("references.txt")),
         variants_txt=temp(_append_res_dir("variants.txt")),
+        config_yaml=temp(_append_res_dir("report_config.yaml")),
     log:
         stdout=str(Path(workflow.basedir) / "logs/create_run_report.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/create_run_report.stderr.log"),
     params:
         references=lambda wildcards: json.dumps({sample: SAMPLES_MAP[sample]["references"] for sample in SAMPLES}),
+        config_yaml=lambda wildcards: yaml.safe_dump(config, sort_keys=False, default_flow_style=False).rstrip("\n"),
         svg="--svg" if config.get("bamdash_static", True) else "--no-svg",
         script=str(Path(workflow.basedir) / "scripts/report_summary.py")
     conda:
@@ -557,10 +560,12 @@ rule create_run_report:
         printf '%s\\n' {input.bamdash_dirs:q} > {output.bamdash_dirs_txt:q}
         printf '%s\\n' {params.references:q} > {output.references_txt:q}
         printf '%s\\n' {input.variants:q} > {output.variants_txt:q}
+        printf '%s\\n' {params.config_yaml:q} > {output.config_yaml:q}
         python {params.script} \
             --bamdash-dirs {output.bamdash_dirs_txt:q} \
             --variants {output.variants_txt:q} \
             --references {output.references_txt:q} \
+            --config {output.config_yaml:q} \
             {params.svg} \
             --output {output.html:q} \
             > {log.stdout:q} 2> {log.stderr:q}

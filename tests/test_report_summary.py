@@ -43,6 +43,7 @@ def test_report_includes_and_excludes_sections(tmp_path: Path) -> None:
 	assert "select-sample" not in content
 	assert "data:image/svg+xml;base64," not in content
 	assert "amp_1" not in content
+	assert "Run configuration" not in content
 
 	(stage / "sample_plot_ref.svg").write_text("<svg></svg>")
 	(stage / "sample_plot_ref_bed_data_1.tabular").write_text(BED)
@@ -70,17 +71,22 @@ def test_cli_main_renders_report(tmp_path: Path) -> None:
 	bamdash_txt = tmp_path / "bamdash_dirs.txt"
 	variants_txt = tmp_path / "variants.txt"
 	references_txt = tmp_path / "references.txt"
+	config_yaml = tmp_path / "report_config.yaml"
 	bamdash_txt.write_text(f"{stage}\n")
 	variants_txt.write_text(f"{variants}\n")
 	references_txt.write_text(json.dumps({"sample": ["ref"]}))
+	config_yaml.write_text("res_dir: results\nbamdash_coverage: 10\nextra: '<tag>'\n")
 
 	main([
 		"--bamdash-dirs", str(bamdash_txt),
 		"--variants", str(variants_txt),
 		"--references", str(references_txt),
+		"--config", str(config_yaml),
 		"--no-svg",
 		"--output", str(output),
 	])
 	content = output.read_text()
 	assert "181" in content and "42" in content
 	assert "data:image/svg+xml;base64," not in content
+	assert "<details class=\"config-block\">" in content
+	assert "res_dir: results\nbamdash_coverage: 10\nextra: &#39;&lt;tag&gt;&#39;" in content
