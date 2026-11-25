@@ -182,6 +182,26 @@ select {
 	font: inherit;
 }
 
+.respro-btn {
+	display: inline-flex;
+	align-items: center;
+	border: 1px solid var(--accent);
+	border-radius: 8px;
+	background: var(--accent);
+	color: white;
+	padding: 8px 14px;
+	font: 600 13px/1.4 ui-sans-serif, system-ui, sans-serif;
+	text-decoration: none;
+}
+
+.respro-btn:hover {
+	opacity: .9;
+}
+
+.respro-btn[hidden] {
+	display: none;
+}
+
 @media (max-width: 720px) {
 	main {
 		margin-top: 26px;

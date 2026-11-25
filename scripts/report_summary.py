@@ -60,6 +60,7 @@ def render_report(
 		output_path: Path,
 		config_yaml: str | None = None,
 		sample_sheet: str | None = None,
+		respro_reports: dict[str, str] | None = None,
 ) -> None:
 	"""Read sample outputs and write a self-contained HTML report."""
 	summary: list[list[str]] = []
@@ -96,6 +97,7 @@ def render_report(
 			"plots": plots,
 			"amplicons": amplicons,
 			"variants": {"headers": variant_headers, "rows": variant_rows},
+			"respro_report": (respro_reports or {}).get(sample),
 		})
 
 	if recovery_key is None:
@@ -125,6 +127,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 	parser.add_argument("--references", type=Path, required=True)
 	parser.add_argument("--config", type=Path, default=None)
 	parser.add_argument("--sample-sheet", type=Path, default=None)
+	parser.add_argument("--respro-reports", type=Path, default=None)
 	parser.add_argument("--svg", action=argparse.BooleanOptionalAction, default=True)
 	parser.add_argument("-o", "--output", type=Path, required=True)
 	return parser.parse_args(argv)
@@ -137,6 +140,7 @@ def main(argv: list[str] | None = None) -> None:
 	references = json.loads(args.references.read_text(encoding="utf-8"))
 	config_yaml = args.config.read_text(encoding="utf-8") if args.config else None
 	sample_sheet = args.sample_sheet.read_text(encoding="utf-8") if args.sample_sheet else None
+	respro_reports = json.loads(args.respro_reports.read_text(encoding="utf-8")) if args.respro_reports else None
 	samples = list(references)
 
 	render_report(
@@ -147,6 +151,7 @@ def main(argv: list[str] | None = None) -> None:
 		args.output,
 		config_yaml=config_yaml,
 		sample_sheet=sample_sheet,
+		respro_reports=respro_reports,
 	)
 
 
