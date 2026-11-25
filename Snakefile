@@ -539,6 +539,7 @@ rule create_run_report:
     input:
         bamdash_dirs=collect(_append_res_dir("{sample}/.bamdash"), sample=SAMPLES),
         variants=collect(_append_res_dir("{sample}/{sample}_variants.tsv"), sample=SAMPLES),
+        sample_sheet=config["sample_sheet"],
     output:
         html=_append_res_dir("report_summary.html"),
         bamdash_dirs_txt=temp(_append_res_dir("bamdash_dirs.txt")),
@@ -566,6 +567,7 @@ rule create_run_report:
             --variants {output.variants_txt:q} \
             --references {output.references_txt:q} \
             --config {output.config_yaml:q} \
+            --sample-sheet {input.sample_sheet:q} \
             {params.svg} \
             --output {output.html:q} \
             > {log.stdout:q} 2> {log.stderr:q}

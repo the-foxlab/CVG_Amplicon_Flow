@@ -55,6 +55,10 @@ header p {
 	margin-top: 16px;
 }
 
+.config-block + .config-block {
+	margin-top: 8px;
+}
+
 .config-block summary {
 	width: fit-content;
 	cursor: pointer;

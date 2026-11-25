@@ -58,6 +58,7 @@ def render_report(
 		include_svg: bool,
 		output_path: Path,
 		config_yaml: str | None = None,
+		sample_sheet: str | None = None,
 ) -> None:
 	"""Read sample outputs and write a self-contained HTML report."""
 	summary: list[list[str]] = []
@@ -109,6 +110,7 @@ def render_report(
 		recovery_key=recovery_key,
 		samples=samples,
 		config_yaml=config_yaml.strip() if config_yaml else None,
+		sample_sheet=sample_sheet.strip() if sample_sheet else None,
 	)
 	output_path.write_text(document, encoding="utf-8")
 
@@ -119,6 +121,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 	parser.add_argument("--variants", type=Path, required=True)
 	parser.add_argument("--references", type=Path, required=True)
 	parser.add_argument("--config", type=Path, default=None)
+	parser.add_argument("--sample-sheet", type=Path, default=None)
 	parser.add_argument("--svg", action=argparse.BooleanOptionalAction, default=True)
 	parser.add_argument("-o", "--output", type=Path, required=True)
 	return parser.parse_args(argv)
@@ -130,6 +133,7 @@ def main(argv: list[str] | None = None) -> None:
 	variant_paths = [Path(line) for line in args.variants.read_text(encoding="utf-8").splitlines()]
 	references = json.loads(args.references.read_text(encoding="utf-8"))
 	config_yaml = args.config.read_text(encoding="utf-8") if args.config else None
+	sample_sheet = args.sample_sheet.read_text(encoding="utf-8") if args.sample_sheet else None
 	samples = list(references)
 
 	render_report(
@@ -139,6 +143,7 @@ def main(argv: list[str] | None = None) -> None:
 		args.svg,
 		args.output,
 		config_yaml=config_yaml,
+		sample_sheet=sample_sheet,
 	)
 
 
