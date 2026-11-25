@@ -3,6 +3,7 @@ configfile: "config.yaml"
 from pathlib import Path
 import json
 import sys
+import yaml
 
 sys.path.insert(0, str(Path(workflow.basedir) / "scripts"))
 
@@ -538,16 +539,22 @@ rule create_run_report:
     input:
         bamdash_dirs=collect(_append_res_dir("{sample}/.bamdash"), sample=SAMPLES),
         variants=collect(_append_res_dir("{sample}/{sample}_variants.tsv"), sample=SAMPLES),
+        respro=[_append_res_dir(f"{sample}/{sample}.respro.html") for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")],
+        sample_sheet=config["sample_sheet"],
     output:
         html=_append_res_dir("report_summary.html"),
         bamdash_dirs_txt=temp(_append_res_dir("bamdash_dirs.txt")),
         references_txt=temp(_append_res_dir("references.txt")),
         variants_txt=temp(_append_res_dir("variants.txt")),
+        respro_reports_txt=temp(_append_res_dir("respro_reports.txt")),
+        config_yaml=temp(_append_res_dir("report_config.yaml")),
     log:
         stdout=str(Path(workflow.basedir) / "logs/create_run_report.stdout.log"),
         stderr=str(Path(workflow.basedir) / "logs/create_run_report.stderr.log"),
     params:
         references=lambda wildcards: json.dumps({sample: SAMPLES_MAP[sample]["references"] for sample in SAMPLES}),
+        respro_reports=lambda wildcards: json.dumps({sample: f"{sample}/{sample}.respro.html" for sample in SAMPLES if SAMPLES_MAP[sample].get("respro_db")}),
+        config_yaml=lambda wildcards: yaml.safe_dump(config, sort_keys=False, default_flow_style=False).rstrip("\n"),
         svg="--svg" if config.get("bamdash_static", True) else "--no-svg",
         script=str(Path(workflow.basedir) / "scripts/report_summary.py")
     conda:
@@ -557,10 +564,15 @@ rule create_run_report:
         printf '%s\\n' {input.bamdash_dirs:q} > {output.bamdash_dirs_txt:q}
         printf '%s\\n' {params.references:q} > {output.references_txt:q}
         printf '%s\\n' {input.variants:q} > {output.variants_txt:q}
+        printf '%s\\n' {params.respro_reports:q} > {output.respro_reports_txt:q}
+        printf '%s\\n' {params.config_yaml:q} > {output.config_yaml:q}
         python {params.script} \
             --bamdash-dirs {output.bamdash_dirs_txt:q} \
             --variants {output.variants_txt:q} \
             --references {output.references_txt:q} \
+            --respro-reports {output.respro_reports_txt:q} \
+            --config {output.config_yaml:q} \
+            --sample-sheet {input.sample_sheet:q} \
             {params.svg} \
             --output {output.html:q} \
             > {log.stdout:q} 2> {log.stderr:q}

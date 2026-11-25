@@ -16,20 +16,37 @@
 </head>
 <body><main>
   <header>
-    <div class="eyebrow">Illumina sequencing · run report</div>
+    <div class="eyebrow">Illumina sequencing · run report · Generated at: {{ generated_at }}</div>
     <h1>Aggregated results</h1>
     <p>Coverage metrics and sample-level reports including coverage plots, amplicon stats and variants.</p>
+    {% if config_yaml %}
+    <details class="config-block">
+      <summary>Run configuration</summary>
+      <pre><code>{{ config_yaml }}</code></pre>
+    </details>
+    {% endif %}
+    {% if sample_sheet %}
+    <details class="config-block">
+      <summary>Sample sheet</summary>
+      <pre><code>{{ sample_sheet }}</code></pre>
+    </details>
+    {% endif %}
   </header>
   <section>
     <h2>Coverage summary</h2>
     {{ table(['Sample', 'Reference', 'Mapped reads', 'Mean coverage', recovery_key], summary) }}
   </section>
-  {% if samples|length > 1 %}
+  {% if samples|length > 1 or samples[0].respro_report %}
   <div class="sample-select">
+    {% if samples|length > 1 %}
     <label for="select-sample">Select sample for specific results</label>
     <select id="select-sample">
       {% for sample in samples %}<option value="{{ sample.name }}">{{ sample.name }}</option>{% endfor %}
     </select>
+    {% endif %}
+    {% for sample in samples %}{% if sample.respro_report %}
+    <a class="respro-btn" data-sample="{{ sample.name }}" href="{{ sample.respro_report }}" target="_blank" rel="noopener noreferrer"{% if not loop.first %} hidden{% endif %}>Open ResPro Report</a>
+    {% endif %}{% endfor %}
   </div>
   {% endif %}
   {% for sample in samples %}
@@ -67,8 +84,8 @@
 <script>
 const select = document.getElementById('select-sample');
 const sync = () => {
-  for (const panel of document.querySelectorAll('.sample-panel')) {
-    panel.hidden = panel.dataset.sample !== select.value;
+  for (const el of document.querySelectorAll('[data-sample]')) {
+    el.hidden = el.dataset.sample !== select.value;
   }
 };
 select.addEventListener('change', sync);

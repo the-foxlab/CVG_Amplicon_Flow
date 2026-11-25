@@ -8,6 +8,7 @@ import base64
 import csv
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -57,6 +58,9 @@ def render_report(
 		sample_references: dict[str, list[str]],
 		include_svg: bool,
 		output_path: Path,
+		config_yaml: str | None = None,
+		sample_sheet: str | None = None,
+		respro_reports: dict[str, str] | None = None,
 ) -> None:
 	"""Read sample outputs and write a self-contained HTML report."""
 	summary: list[list[str]] = []
@@ -93,6 +97,7 @@ def render_report(
 			"plots": plots,
 			"amplicons": amplicons,
 			"variants": {"headers": variant_headers, "rows": variant_rows},
+			"respro_report": (respro_reports or {}).get(sample),
 		})
 
 	if recovery_key is None:
@@ -103,10 +108,14 @@ def render_report(
 		autoescape=True,
 		undefined=StrictUndefined,
 	)
+	timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 	document = env.get_template("report.html.j2").render(
 		summary=summary,
 		recovery_key=recovery_key,
 		samples=samples,
+		config_yaml=config_yaml.strip() if config_yaml else None,
+		sample_sheet=sample_sheet.strip() if sample_sheet else None,
+		generated_at=timestamp,
 	)
 	output_path.write_text(document, encoding="utf-8")
 
@@ -116,6 +125,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 	parser.add_argument("--bamdash-dirs", type=Path, required=True)
 	parser.add_argument("--variants", type=Path, required=True)
 	parser.add_argument("--references", type=Path, required=True)
+	parser.add_argument("--config", type=Path, default=None)
+	parser.add_argument("--sample-sheet", type=Path, default=None)
+	parser.add_argument("--respro-reports", type=Path, default=None)
 	parser.add_argument("--svg", action=argparse.BooleanOptionalAction, default=True)
 	parser.add_argument("-o", "--output", type=Path, required=True)
 	return parser.parse_args(argv)
@@ -126,6 +138,9 @@ def main(argv: list[str] | None = None) -> None:
 	bamdash_paths = [Path(line) for line in args.bamdash_dirs.read_text(encoding="utf-8").splitlines()]
 	variant_paths = [Path(line) for line in args.variants.read_text(encoding="utf-8").splitlines()]
 	references = json.loads(args.references.read_text(encoding="utf-8"))
+	config_yaml = args.config.read_text(encoding="utf-8") if args.config else None
+	sample_sheet = args.sample_sheet.read_text(encoding="utf-8") if args.sample_sheet else None
+	respro_reports = json.loads(args.respro_reports.read_text(encoding="utf-8")) if args.respro_reports else None
 	samples = list(references)
 
 	render_report(
@@ -134,6 +149,9 @@ def main(argv: list[str] | None = None) -> None:
 		references,
 		args.svg,
 		args.output,
+		config_yaml=config_yaml,
+		sample_sheet=sample_sheet,
+		respro_reports=respro_reports,
 	)
 
 
