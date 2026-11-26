@@ -192,24 +192,17 @@ rule split_bam_by_reference:
         filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam"),
         filtered_bai=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam.bai")
     output:
-        temp_bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.temp.bam")),
         bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam")),
         bai=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam.bai")),
-    log: 
+    log:
         stdout="logs/{sample}/split_bam_{reference}.stdout.log",
         stderr="logs/{sample}/split_bam_{reference}.stderr.log"
-    params:
-        exclude_refs = lambda wildcards: "|".join(
-            ref for ref in SAMPLES_MAP[wildcards.sample]["references"] if ref != wildcards.reference
-        ),
     conda:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        samtools view -h {input.filtered_bam:q} {wildcards.reference:q} | egrep -v {params.exclude_refs:q} \
-        | samtools view -bhS - > {output.temp_bam:q} 2> {log.stderr:q};
-        samtools sort -o {output.bam:q} {output.temp_bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
-        samtools index {output.bam:q} >> {log.stdout:q} 2>> {log.stderr:q};
+        samtools view -b -o {output.bam:q} {input.filtered_bam:q} {wildcards.reference:q} > {log.stdout:q} 2> {log.stderr:q}
+        samtools index {output.bam:q} >> {log.stdout:q} 2>> {log.stderr:q}
         """
 
 
