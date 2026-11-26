@@ -191,6 +191,8 @@ rule split_bam_by_reference:
         filtered_bam=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam"),
         filtered_bai=_append_res_dir("{sample}/mapping/{sample}.sorted.filtered.bam.bai")
     output:
+        temp_bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.temp.bam")),
+        temp_header=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.header.sam")),
         bam=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam")),
         bai=temp(_append_res_dir("{sample}/mapping/{sample}_{reference}.sorted.filtered.bam.bai")),
     log:
@@ -200,7 +202,11 @@ rule split_bam_by_reference:
         'requirements/requirements_aln.yaml'
     shell:
         """
-        samtools view -b -o {output.bam:q} {input.filtered_bam:q} {wildcards.reference:q} > {log.stdout:q} 2> {log.stderr:q}
+        samtools view -b -o {output.temp_bam:q} {input.filtered_bam:q} {wildcards.reference:q} > {log.stdout:q} 2> {log.stderr:q}
+        # keep only the @SQ line whose SN field exactly equals the reference (string comparison, no regex/substring matching)
+        samtools view -H {input.filtered_bam:q} \
+        | awk -F '\\t' -v ref={wildcards.reference:q} '$1 != "@SQ" || $2 == "SN:" ref' > {output.temp_header:q} 2>> {log.stderr:q}
+        samtools reheader {output.temp_header:q} {output.temp_bam:q} > {output.bam:q} 2>> {log.stderr:q}
         samtools index {output.bam:q} >> {log.stdout:q} 2>> {log.stderr:q}
         """
 
